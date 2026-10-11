@@ -159,7 +159,7 @@ export async function render(root) {
   }
 
   const td = (c, v) => typeof v === 'number' ? h('td', { class: 'num' }, fmt(c, v))
-    : String(v ?? '').length > 40 ? h('td', { class: 'wrap' }, h('div', { class: 'clamp3', title: String(v) }, fmt(c, v))) : h('td', {}, fmt(c, v));
+    : String(v ?? '').length > 40 ? h('td', { class: 'wrap' }, fmt(c, v)) : h('td', {}, fmt(c, v));
   const vendorLink = (org) => h('a', { href: '#', onclick: (e) => { e.preventDefault(); viewVendor(org); } }, org);
 
   function tabBody(derived) {
@@ -171,7 +171,7 @@ export async function render(root) {
           'Delivers to All Locations', 'Q&A Style', 'Avg QA Confidence / 10', 'Lead Time (Days)', 'Payment Terms', 'Freight Included', 'Bundle Conditions', 'Special Notes'],
         cell: (c, v) => c === 'Vendor' ? h('td', { style: { whiteSpace: 'nowrap' } }, vendorLink(v))
           : c === 'Compliance Status' ? h('td', {}, h('span', { class: `pill xs ${v === 'PASS' ? 'tone-success' : 'tone-error'}` }, v))
-            : ['Fail Reasons', 'Missing Items', 'Items Not in RFQ', 'Flags'].includes(c) ? h('td', { class: 'wrap', style: { minWidth: '260px' } }, h('div', { class: 'clamp3', title: v || '', style: { WebkitLineClamp: 3 } }, v || '—'))
+            : ['Fail Reasons', 'Missing Items', 'Items Not in RFQ', 'Flags', 'Bundle Conditions', 'Special Notes', 'Payment Terms'].includes(c) ? h('td', { class: 'wrap long' }, v || '—')
               : td(c, v) }));
     }
     if (tab === 'line_matrix') {
