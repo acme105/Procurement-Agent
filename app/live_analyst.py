@@ -31,9 +31,14 @@ Rules:
   use query_table (filters, group_by, aggregations, sort) or run_scenario instead.
 - Money is INR. Write it with Indian grouping or in crore/lakh (e.g. ₹10.24 crore).
 - Name the table you used, e.g. "(vendor_summary)".
-- If the buyer asks about something the tables don't cover (warranty length, support, delivery split, validity…),
-  call get_evidence for one or two vendors to check, then offer or call add_parameter to extract it from every proposal.
-- When asked what else to compare on, look at get_evidence for a few vendors and suggest 3-5 concrete parameters.
+- Comparative questions about something the tables don't hold ("which vendor has the most detailed delivery plan", "who has
+  the best support terms", "who is strongest on warranty"): call compare_vendors FIRST. It returns every vendor's evidence in
+  one result. Judge only from it. Never name a winner after looking at some vendors, and never say what "the other proposals"
+  contain unless this tool covered them. State your coverage ("I compared all 8 proposals" or which ones had thin evidence;
+  scanned or photo proposals have no text excerpt, only the extracted answers). Give a ranking of the top vendors with the
+  specific details that justify it, not only the winner. For a scored, repeatable answer offer a scorecard criterion.
+- get_evidence is for one named vendor. When asked what else to compare on, call compare_vendors on a topic or two, then
+  suggest 3-5 concrete parameters, and offer add_parameter to extract one from every proposal.
 - Use save_as when you build a table the buyer may want again; say its name.
 - When the buyer asks to see a proposal, call open_proposal.
 - When asked why a vendor failed or what it missed, name the specific items: use the Fail Reasons, Missing Items and
@@ -88,6 +93,14 @@ TOOLS = [
             "fx_usd_inr": {"type": "number"}, "qa_threshold": {"type": "number"},
             "scorecard_version": {"type": "integer", "description": "Rank with an earlier scorecard version"}},
             "required": ["name"]}}},
+    {"type": "function", "function": {
+        "name": "compare_vendors",
+        "description": "Evidence on a topic from EVERY vendor in one result: their extracted answers to the relevant RFQ questions, notes and terms, plus text excerpts around the keywords from the original documents (image-only proposals have none). Use it before comparing or ranking vendors on anything the tables don't hold. No model call; instant.",
+        "parameters": {"type": "object", "properties": {
+            "topic": {"type": "string", "description": "What is being compared, e.g. 'delivery plan'"},
+            "question_numbers": {"type": "array", "items": {"type": "integer"}, "description": "RFQ question numbers that relate to the topic (omit for all answers)"},
+            "keywords": {"type": "array", "items": {"type": "string"}, "description": "Words to find in the documents, e.g. ['dispatch','tracking','warehouse','delivery']"}},
+            "required": ["topic"]}}},
     {"type": "function", "function": {
         "name": "get_evidence",
         "description": "A vendor's full extraction (terms, notes, answers, sample rows) and, for text files, an excerpt of the proposal itself.",
@@ -244,6 +257,51 @@ def _sc_result(rid: str, v: dict, extra: Optional[dict] = None) -> str:
                                                                       for c in v["criteria"]], "ranking": ranking, **(extra or {})}, default=str)
 
 
+def _windows(text: str, keywords: list[str], width: int = 260, limit: int = 4) -> list[str]:
+    """Short stretches of the document around the first matches of the keywords, so one result can cover every vendor."""
+    low, out, last = text.lower(), [], -10**9
+    hits = sorted(i for k in keywords if k for i in [low.find(k.lower())] if i >= 0)
+    for i in hits:
+        if i - last < width:
+            continue
+        out.append(" ".join(text[max(0, i - width // 2): i + width].split()))
+        last = i
+        if len(out) >= limit:
+            break
+    return out
+
+
+def compare_vendors(rid: str, run_id: str, topic: str, question_numbers: list[int], keywords: list[str]) -> str:
+    """Every vendor's evidence on a topic in one result, so a ranking can't be made from a sample."""
+    st = L.load(rid)
+    m = C.read_manifest(rid, run_id)
+    by_pid = {e["pid"]: e for e in C.extractions(rid, run_id)}
+    keywords = keywords or [w for w in topic.lower().split() if len(w) > 3]
+    vendors, image_only, failed = [], [], []
+    for p in m["proposals"]:
+        ex = by_pid.get(p["pid"])
+        if not ex:
+            failed.append(p["org"])
+            continue
+        prop = ex["proposal"]
+        answers = [{"question_number": q.get("question_number"), "question": q["question"][:140], "answer": q["answer"], "score": q["confidence_score"]}
+                   for q in prop["questionnaire_answers"] if not question_numbers or q.get("question_number") in question_numbers or q.get("question_number") is None]
+        try:
+            parts = C.read_parts(C._upload_path(rid, st, p["n"]))
+            text = "\n".join(x.get("text", "") for x in parts if x.get("type") == "input_text")
+        except Exception:
+            text = ""
+        windows = _windows(text, keywords) if text else []
+        if not text:
+            image_only.append(p["org"])
+        vendors.append({"vendor": p["org"], "questionnaire_style": prop["questionnaire_style"], "answers": answers,
+                        "lead_time_days": prop.get("lead_time_days"), "payment_terms": prop.get("payment_terms"), "freight_included": prop.get("freight_included"),
+                        "special_notes": prop.get("special_notes"), "document_excerpts": windows or ("(no text in this document: image or scan)" if not text else "(no match for the keywords)")})
+    return json.dumps({"topic": topic, "coverage": {"vendors_in_run": len(m["proposals"]), "vendors_returned": len(vendors), "image_only_no_excerpts": image_only, "not_extracted": failed},
+                       "instruction": "Judge only from this result. Name every vendor you compare and state this coverage in your answer.", "vendors": vendors},
+                      ensure_ascii=False, default=str)
+
+
 def call_tool(rid: str, run_id: str, name: str, a: dict, events: list, ctx: Optional[dict] = None) -> str:
     ctx = ctx or {}
     if name == "get_scorecard":
@@ -306,6 +364,8 @@ def call_tool(rid: str, run_id: str, name: str, a: dict, events: list, ctx: Opti
         vs = tables["vendor_summary"]
         top = vs[[c for c in ("Rank", "Vendor", "Compliance Status", "Score / 100", "Fail Reasons", "Final Landed Cost (INR)") if c in vs.columns]]
         return json.dumps({"summary": summary, "ranking": C.records(top), "saved": saved}, default=str)
+    if name == "compare_vendors":
+        return compare_vendors(rid, run_id, a.get("topic", ""), a.get("question_numbers") or [], a.get("keywords") or [])
     if name == "get_evidence":
         p = _vendor(rid, run_id, a["vendor"])
         ex = next((e for e in C.extractions(rid, run_id) if e["pid"] == p["pid"]), None)

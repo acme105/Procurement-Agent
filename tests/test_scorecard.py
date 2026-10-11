@@ -226,3 +226,18 @@ def test_versions_keep_their_own_scores_and_can_be_restored(state_dir, equal_wei
         SC.restore(rid, 4)                                                                    # already current
     with pytest.raises(ValueError):
         SC.restore(rid, 99)
+
+
+def test_compare_vendors_returns_every_vendor_with_coverage(state_dir, equal_weights, monkeypatch):
+    rid = _setup(VENDORS)
+    texts = {"P001": "We dispatch from our Pune warehouse. Live tracking links are sent. Delivery in 12 days.", "P002": "Prices are firm for 30 days.", "P003": ""}
+    monkeypatch.setattr(C, "_upload_path", lambda rid, st, n: f"P{n:03d}")
+    monkeypatch.setattr(C, "read_parts", lambda path: [{"type": "input_text", "text": texts[path]}] if texts[path] else [{"type": "input_image"}])
+    out = json.loads(A.call_tool(rid, "R-001", "compare_vendors", {"topic": "delivery plan", "question_numbers": [1], "keywords": ["dispatch", "tracking"]}, []))
+    assert out["coverage"]["vendors_in_run"] == 3 and out["coverage"]["vendors_returned"] == 3                # all of them, never a sample
+    assert out["coverage"]["image_only_no_excerpts"] == ["Silent"]
+    by = {v["vendor"]: v for v in out["vendors"]}
+    assert any("Pune warehouse" in w for w in by["Cheap Slow"]["document_excerpts"])
+    assert by["Dear Fast"]["document_excerpts"] == "(no match for the keywords)"
+    assert [a["question_number"] for a in by["Cheap Slow"]["answers"]] == [1]                                 # only the asked question
+    assert "compare_vendors" in A.SYSTEM and "Never name a winner after looking at some vendors" in A.SYSTEM
