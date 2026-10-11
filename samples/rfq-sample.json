@@ -1,0 +1,502 @@
+{
+ "scope": "Fulfil technology requests for offices in Delhi, Mumbai, Pune, Bangalore, Hyderabad, Chennai, Kolkata, Vishakhapatnam, Ahmedabad, Noida, Gurgaon, Chandigarh, and Jaipur",
+ "items": [
+  {
+   "item_codes": [],
+   "generic_requirements": "Apple MacBook Pro 14.2-inch, M3 Max, 36GB RAM, 512GB SSD | Apple MacBook Pro, M3 Max, 36GB RAM, 14.2-inch display",
+   "location": "Delhi",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Apple MacBook Pro 14.2-inch, M3 Max, 36GB RAM, 512GB SSD | Apple MacBook Pro, M3 Max, 36GB RAM, 14.2-inch display",
+   "location": "Mumbai",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Apple MacBook Pro 14.2-inch, M3 Max, 36GB RAM, 512GB SSD | Apple MacBook Pro, M3 Max, 36GB RAM, 14.2-inch display",
+   "location": "Pune",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Apple MacBook Pro 14.2-inch, M3 Max, 36GB RAM, 512GB SSD | Apple MacBook Pro, M3 Max, 36GB RAM, 14.2-inch display",
+   "location": "Bangalore",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Apple MacBook Pro 14.2-inch, M3 Max, 36GB RAM, 512GB SSD | Apple MacBook Pro, M3 Max, 36GB RAM, 14.2-inch display",
+   "location": "Hyderabad",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Apple MacBook Pro 14.2-inch, M3 Max, 36GB RAM, 512GB SSD | Apple MacBook Pro, M3 Max, 36GB RAM, 14.2-inch display",
+   "location": "Chennai",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Apple MacBook Pro 14.2-inch, M3 Max, 36GB RAM, 512GB SSD | Apple MacBook Pro, M3 Max, 36GB RAM, 14.2-inch display",
+   "location": "Kolkata",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Apple MacBook Pro 14.2-inch, M3 Max, 36GB RAM, 512GB SSD | Apple MacBook Pro, M3 Max, 36GB RAM, 14.2-inch display",
+   "location": "Vishakhapatnam",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Apple MacBook Pro 14.2-inch, M3 Max, 36GB RAM, 512GB SSD | Apple MacBook Pro, M3 Max, 36GB RAM, 14.2-inch display",
+   "location": "Ahmedabad",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Apple MacBook Pro 14.2-inch, M3 Max, 36GB RAM, 512GB SSD | Apple MacBook Pro, M3 Max, 36GB RAM, 14.2-inch display",
+   "location": "Noida",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Apple MacBook Pro 14.2-inch, M3 Max, 36GB RAM, 512GB SSD | Apple MacBook Pro, M3 Max, 36GB RAM, 14.2-inch display",
+   "location": "Gurgaon",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Apple MacBook Pro 14.2-inch, M3 Max, 36GB RAM, 512GB SSD | Apple MacBook Pro, M3 Max, 36GB RAM, 14.2-inch display",
+   "location": "Chandigarh",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Apple MacBook Pro 14.2-inch, M3 Max, 36GB RAM, 512GB SSD | Apple MacBook Pro, M3 Max, 36GB RAM, 14.2-inch display",
+   "location": "Jaipur",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Laptop, Intel Core i3 processor, 13-inch screen, 8GB RAM, 256GB storage",
+   "location": "Delhi",
+   "quantity": 50
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Laptop, Intel Core i3 processor, 13-inch screen, 8GB RAM, 256GB storage",
+   "location": "Mumbai",
+   "quantity": 50
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Laptop, Intel Core i3 processor, 13-inch screen, 8GB RAM, 256GB storage",
+   "location": "Pune",
+   "quantity": 50
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Laptop, Intel Core i3 processor, 13-inch screen, 8GB RAM, 256GB storage",
+   "location": "Bangalore",
+   "quantity": 50
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Laptop, Intel Core i3 processor, 13-inch screen, 8GB RAM, 256GB storage",
+   "location": "Hyderabad",
+   "quantity": 50
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Laptop, Intel Core i3 processor, 13-inch screen, 8GB RAM, 256GB storage",
+   "location": "Chennai",
+   "quantity": 50
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Laptop, Intel Core i3 processor, 13-inch screen, 8GB RAM, 256GB storage",
+   "location": "Kolkata",
+   "quantity": 50
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Laptop, Intel Core i3 processor, 13-inch screen, 8GB RAM, 256GB storage",
+   "location": "Vishakhapatnam",
+   "quantity": 50
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Laptop, Intel Core i3 processor, 13-inch screen, 8GB RAM, 256GB storage",
+   "location": "Ahmedabad",
+   "quantity": 50
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Laptop, Intel Core i3 processor, 13-inch screen, 8GB RAM, 256GB storage",
+   "location": "Noida",
+   "quantity": 50
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Laptop, Intel Core i3 processor, 13-inch screen, 8GB RAM, 256GB storage",
+   "location": "Gurgaon",
+   "quantity": 50
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Laptop, Intel Core i3 processor, 13-inch screen, 8GB RAM, 256GB storage",
+   "location": "Chandigarh",
+   "quantity": 50
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Laptop, Intel Core i3 processor, 13-inch screen, 8GB RAM, 256GB storage",
+   "location": "Jaipur",
+   "quantity": 50
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "LG 32-inch Monitor, 1080p IPS, 120Hz",
+   "location": "Bangalore",
+   "quantity": 12
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "LG 32-inch Monitor, 1080p IPS, 120Hz",
+   "location": "Delhi",
+   "quantity": 12
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "LG 32-inch Monitor, 1080p IPS, 120Hz",
+   "location": "Mumbai",
+   "quantity": 12
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "LG 32-inch Monitor, 1080p IPS, 120Hz",
+   "location": "Pune",
+   "quantity": 12
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "LG 32-inch Monitor, 1080p IPS, 120Hz",
+   "location": "Hyderabad",
+   "quantity": 12
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "LG 32-inch Monitor, 1080p IPS, 120Hz",
+   "location": "Chennai",
+   "quantity": 12
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "LG 32-inch Monitor, 1080p IPS, 120Hz",
+   "location": "Gurgaon",
+   "quantity": 12
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "LG 32-inch Monitor, 1080p IPS, 120Hz",
+   "location": "Noida",
+   "quantity": 12
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "LG 24-inch Monitor, 1080p IPS, 60Hz with USB-C Hub",
+   "location": "Bangalore",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "LG 24-inch Monitor, 1080p IPS, 60Hz with USB-C Hub",
+   "location": "Delhi",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "LG 24-inch Monitor, 1080p IPS, 60Hz with USB-C Hub",
+   "location": "Mumbai",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "LG 24-inch Monitor, 1080p IPS, 60Hz with USB-C Hub",
+   "location": "Pune",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "LG 24-inch Monitor, 1080p IPS, 60Hz with USB-C Hub",
+   "location": "Hyderabad",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "LG 24-inch Monitor, 1080p IPS, 60Hz with USB-C Hub",
+   "location": "Chennai",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "LG 24-inch Monitor, 1080p IPS, 60Hz with USB-C Hub",
+   "location": "Gurgaon",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "LG 24-inch Monitor, 1080p IPS, 60Hz with USB-C Hub",
+   "location": "Noida",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Bluetooth keyboard",
+   "location": "Delhi",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Bluetooth keyboard",
+   "location": "Mumbai",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Bluetooth keyboard",
+   "location": "Pune",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Bluetooth keyboard",
+   "location": "Bangalore",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Bluetooth keyboard",
+   "location": "Hyderabad",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Bluetooth keyboard",
+   "location": "Chennai",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Bluetooth keyboard",
+   "location": "Kolkata",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Bluetooth keyboard",
+   "location": "Vishakhapatnam",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Bluetooth keyboard",
+   "location": "Ahmedabad",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Bluetooth keyboard",
+   "location": "Noida",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Bluetooth keyboard",
+   "location": "Gurgaon",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Bluetooth keyboard",
+   "location": "Chandigarh",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Bluetooth keyboard",
+   "location": "Jaipur",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Bluetooth mouse",
+   "location": "Delhi",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Bluetooth mouse",
+   "location": "Mumbai",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Bluetooth mouse",
+   "location": "Pune",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Bluetooth mouse",
+   "location": "Bangalore",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Bluetooth mouse",
+   "location": "Hyderabad",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Bluetooth mouse",
+   "location": "Chennai",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Bluetooth mouse",
+   "location": "Kolkata",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Bluetooth mouse",
+   "location": "Vishakhapatnam",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Bluetooth mouse",
+   "location": "Ahmedabad",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Bluetooth mouse",
+   "location": "Noida",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Bluetooth mouse",
+   "location": "Gurgaon",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Bluetooth mouse",
+   "location": "Chandigarh",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "Bluetooth mouse",
+   "location": "Jaipur",
+   "quantity": 25
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "USB-C docking station",
+   "location": "Delhi",
+   "quantity": 20
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "USB-C docking station",
+   "location": "Mumbai",
+   "quantity": 20
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "USB-C docking station",
+   "location": "Pune",
+   "quantity": 20
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "USB-C docking station",
+   "location": "Bangalore",
+   "quantity": 20
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "USB-C docking station",
+   "location": "Hyderabad",
+   "quantity": 20
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "USB-C docking station",
+   "location": "Chennai",
+   "quantity": 20
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "USB-C docking station",
+   "location": "Kolkata",
+   "quantity": 20
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "USB-C docking station",
+   "location": "Vishakhapatnam",
+   "quantity": 20
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "USB-C docking station",
+   "location": "Ahmedabad",
+   "quantity": 20
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "USB-C docking station",
+   "location": "Noida",
+   "quantity": 20
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "USB-C docking station",
+   "location": "Gurgaon",
+   "quantity": 20
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "USB-C docking station",
+   "location": "Chandigarh",
+   "quantity": 20
+  },
+  {
+   "item_codes": [],
+   "generic_requirements": "USB-C docking station ",
+   "location": "Jaipur",
+   "quantity": 20
+  }
+ ],
+ "questionnaire": [
+  "Confirm delivery of all items within 15 days of contract finalisation, with site-wise delivery timelines.",
+  "Confirm payment terms: payment within 30 days of receipt of final items; invoices are cleared on the first of the month.",
+  "Confirm laptops include a warranty of at least 2 years.",
+  "Confirm monitors include a warranty of at least 1 year.",
+  "Provide unit pricing and applicable taxes for each item.",
+  "Describe after-sales support and the escalation process.",
+  "A one-time 2% penalty will be deducted from final payment for any delivery delay. Confirm acceptance.",
+  "Any delay exceeding 60 days from contract finalisation will result in forfeiture of the contract. Confirm acceptance.",
+  "For partial delivery, payment for fulfilled items will be processed automatically, less the 2% penalty, and no further delivery will be accepted. Confirm acceptance."
+ ]
+}
