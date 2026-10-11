@@ -96,6 +96,7 @@ Your job is to actively guide the user to build a complete RFx step-by-step. Do 
    *INTERNET SEARCH*: If the user asks a technical or domain-specific question (e.g., "Does the M3 Max have a GPU?"), use the search_internet tool to gather factual information before answering.
 3. Questionnaire: Ask them if they want to include a questionnaire for vendors. Use set_questionnaire to save their questions. Note that set_questionnaire COMPLETELY OVERWRITES the previous list, so if the user asks you to modify a question, rewrite the entire list and pass it in.
 Important rules:
+- NEVER add an item, or a quantity, that the buyer has not stated themselves. Do not add items "to be helpful", from your own suggestions, or with a quantity you assumed. If something is unclear, ask. The system refuses an add whose item or quantity does not appear in the buyer's messages.
 - Remind them of what is remaining if they miss a step.
 - Finish ONE STEP at a time.
 - Keep your answers very short and conversational.
@@ -299,8 +300,56 @@ def view(st: dict, request: Optional[Request] = None) -> dict:
     return out
 
 
+_NUM_WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11, "twelve": 12,
+              "fifteen": 15, "twenty": 20, "thirty": 30, "forty": 40, "fifty": 50, "hundred": 100, "dozen": 12}
+_STOP = {"with", "from", "inch", "core", "unit", "units", "each", "item", "items", "type", "types", "and", "the", "for", "per", "pcs", "piece", "pieces", "ram", "ssd", "series", "model"}
+
+
+def _tokens(text: str) -> set[str]:
+    """Significant words, with plurals folded ("laptops" is "laptop", "mice" is "mouse")."""
+    out = set()
+    for t in re.findall(r"[a-z0-9]+", (text or "").lower()):
+        t = "mouse" if t == "mice" else (t[:-1] if len(t) > 3 and t.endswith("s") and not t.endswith("ss") else t)
+        if (len(t) >= 3 and t not in _STOP) or t.isdigit():
+            out.add(t)
+    return out
+
+
+def ungrounded(st: dict, args: dict) -> Optional[str]:
+    """Why an add_to_rfx call can't be accepted: the item or quantity never came from the buyer. None if it is grounded."""
+    chat = st.get("chat") or []
+    said = " ".join(m["text"] for m in chat if m.get("role") == "user")
+    discussed = said + " " + " ".join(m["text"] for m in chat if m.get("role") == "assistant")         # options Ana listed and the buyer picked
+    said_numbers = {int(n) for n in re.findall(r"(?<![\d.])(\d+)(?![\d.])", said)} | {v for w, v in _NUM_WORDS.items() if re.search(rf"\b{w}\b", said.lower())}
+    for site, q in (args.get("site_quantities") or {}).items():
+        try:
+            if int(q) not in said_numbers:
+                return f"The quantity {q} for '{site}' was not given by the buyer. Ask them for the quantity instead of assuming one."
+        except (TypeError, ValueError):
+            return f"The quantity '{q}' is not a number. Ask the buyer."
+    words = _tokens(discussed)
+    texts = []
+    if args.get("generic_requirements"):
+        texts.append(("the requirement", args["generic_requirements"]))
+    codes = args.get("item_codes") or []
+    if codes:
+        d = catalog()
+        for code in codes:
+            row = d[d["item_code"] == code]
+            texts.append((code, row["description"].iloc[0] if len(row) else ""))
+    for label, text in texts:
+        mine = _tokens(text)
+        if mine and not (mine & words):
+            return f"'{text[:60]}' ({label}) has not been mentioned by the buyer. Do not add items they did not ask for; ask them first."
+    return None
+
+
 def apply_tool(st: dict, name: str, args: dict) -> str:
     r = st["rfx"]
+    if name == "add_to_rfx":
+        why = ungrounded(st, args)
+        if why:
+            return "NOT ADDED. " + why
     if name == "search_catalog":
         return json.dumps(search_catalog(**args))
     if name == "search_internet":

@@ -125,11 +125,43 @@ def test_failure_names_missing_and_unrequested_items(state_dir):
 
 def test_several_catalog_codes_become_separate_lines(state_dir):
     st = L.create_rfq()
+    _chat(st, ("user", "Add these laptops, 5 units of each, for Manyata."))
     out = L.apply_tool(st, "add_to_rfx", {"item_codes": ["IT-LAP-0001", "IT-LAP-0002", "IT-LAP-0003"], "site_quantities": {"Manyata": 5}})
     assert len(st["rfx"]["items"]) == 3 and out.endswith("[1, 2, 3]")
     assert [i["item_codes"] for i in st["rfx"]["items"]] == [["IT-LAP-0001"], ["IT-LAP-0002"], ["IT-LAP-0003"]]
     assert all(i["location"] == "Manyata" and i["quantity"] == 5 for i in st["rfx"]["items"])
     # codes together with a requirement text stay one line; a free-text item is one line
+    _chat(st, ("user", "Add 5 laptops, 1 of the either-is-fine one, and USB 3.0 pen drive 8 GB: 20 for Manyata and 10 for the Annexe."))
     L.apply_tool(st, "add_to_rfx", {"item_codes": ["A", "B"], "generic_requirements": "either is fine", "site_quantities": {"Manyata": 1}})
     L.apply_tool(st, "add_to_rfx", {"generic_requirements": "USB 3.0 pen drive 8 GB", "site_quantities": {"Manyata": 20, "Annexe": 10}})
     assert len(st["rfx"]["items"]) == 3 + 1 + 2
+
+
+def _chat(st, *msgs):
+    st["chat"] = [{"role": r, "text": t} for r, t in msgs]
+
+
+def test_items_and_quantities_the_buyer_never_stated_are_not_added(state_dir):
+    st = L.create_rfq()
+    _chat(st, ("user", "Set the title and deliver to Tower D2, 5th Floor, Bengaluru 560045. Items to follow."))
+    out = L.apply_tool(st, "add_to_rfx", {"generic_requirements": "Desk phone with VoIP capability", "site_quantities": {"Manyata": 6}})
+    assert out.startswith("NOT ADDED") and st["rfx"]["items"] == []                         # the real failure: an invented item and quantity
+    _chat(st, ("user", "I need laptops, 5 units of each, delivered to Manyata."))
+    out = L.apply_tool(st, "add_to_rfx", {"generic_requirements": "Laptop, Core i5, 16GB RAM", "site_quantities": {"Manyata": 8}})
+    assert out.startswith("NOT ADDED") and "8" in out                                         # right item, invented quantity
+    out = L.apply_tool(st, "add_to_rfx", {"generic_requirements": "Standing desk", "site_quantities": {"Manyata": 5}})
+    assert out.startswith("NOT ADDED") and "not been mentioned" in out                        # right quantity, item never mentioned
+    assert st["rfx"]["items"] == []
+
+
+def test_grounded_adds_still_work(state_dir):
+    st = L.create_rfq()
+    _chat(st, ("user", "Add 10 units of Logitech Ergonomic Mouse, Wired USB and twenty pen drives of 8 GB for Manyata."))
+    assert L.apply_tool(st, "add_to_rfx", {"generic_requirements": "Logitech Ergonomic Mouse, Wired USB", "site_quantities": {"Manyata": 10}}).startswith("Items added")
+    assert L.apply_tool(st, "add_to_rfx", {"generic_requirements": "USB 3.0 pen drive, 8 GB", "site_quantities": {"Manyata": 20}}).startswith("Items added")
+    # a quantity said earlier in the conversation still counts, and a catalog pick the buyer made from Ana's list is fine
+    _chat(st, ("user", "I want 5 of each laptop."), ("assistant", "We have Dell Business Laptop 13.3-inch and Apple MacBook Air options."), ("user", "The Dell one."))
+    assert L.apply_tool(st, "add_to_rfx", {"generic_requirements": "Dell Business Laptop 13.3-inch", "site_quantities": {"Manyata": 5}}).startswith("Items added")
+    # several catalog codes are several items and no quantity means nothing to check
+    _chat(st, ("user", "Add all of the laptops please."), ("assistant", "Dell Business Laptop options"))
+    assert L.apply_tool(st, "add_to_rfx", {"generic_requirements": "Dell laptop"}).startswith("Items added")
