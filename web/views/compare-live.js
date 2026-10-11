@@ -45,7 +45,7 @@ export async function render(root) {
   const rfqs = await api('/api/live/compare/rfqs');
   let rid = qs().get('id') || (rfqs[0] && rfqs[0].id);
   if (!rid) {
-    root.replaceChildren(h('div', { class: 'empty' }, 'No finalised RFQs yet. Finalise one in Live RFQ, then compare its quotes here.'));
+    root.replaceChildren(h('div', { class: 'empty' }, 'No finalised RFQs yet. Finalise one under List of RFQs, then compare its quotes here.'));
     return;
   }
   let home = null, runId = null, run = null, tab = 'vendor_summary', derivedSel = null, chat = [], busy = false, polling = false;

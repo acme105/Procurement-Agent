@@ -47,13 +47,15 @@ export async function render(root) {
     prev = keys;
     const ready = !!v.scope && v.lines.length > 0;
     centre.replaceChildren(
-      h('div', { class: 'row', style: { justifyContent: 'space-between' } },
-        h('div', {}, h('div', { class: 'meta mono' }, v.id),
-          h('div', { class: 'h4' }, v.scope || 'Untitled RFQ')),
-        h('div', { class: 'row' }, h('span', { class: `pill ${final ? 'tone-success' : 'tone-warning'}` }, final ? 'FINAL' : 'DRAFT'),
+      // title on the left (wraps), actions pinned top-right: New RFQ is always the right-most button, whatever the title length
+      h('div', { style: { display: 'flex', alignItems: 'flex-start', gap: '16px' } },
+        h('div', { style: { flex: '1 1 auto', minWidth: 0 } }, h('div', { class: 'meta mono' }, v.id),
+          h('div', { class: 'h5 clamp2', title: v.scope || '', style: { fontSize: '18px', lineHeight: '1.35' } }, v.scope || 'Untitled RFQ')),
+        h('div', { style: { display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 } },
+          h('span', { class: `pill ${final ? 'tone-success' : 'tone-warning'}` }, final ? 'FINAL' : 'DRAFT'),
           final ? h('a', { class: 'btn sm', href: `#/compare-live?id=${v.id}` }, 'Compare quotes') : null,
           h('button', { class: 'btn sm', onclick: history }, 'History'),
-          h('button', { class: 'btn sm', onclick: newRfq }, 'New RFQ'))),
+          h('button', { class: 'btn primary flat sm', onclick: newRfq }, 'New RFQ'))),
       h('div', { class: 'card pad0' }, lines),
       h('div', { class: 'card' }, h('div', { class: 'h5 mb8' }, 'Questions for suppliers'), qs),
       final ? sendPanel() : h('div', { class: 'row' },

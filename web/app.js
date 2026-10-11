@@ -2,7 +2,7 @@
 import { h, errorBox } from './components.js';
 
 const ROUTES = [
-  ['live', 'Live RFQ', 'Build by chat'],
+  ['live', 'List of RFQs', 'Build by chat'],
   ['compare-live', 'Compare quotes', 'Proposals and analyst'],
 ];
 const DEFAULT = 'live';
