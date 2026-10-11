@@ -1,6 +1,6 @@
 """Live RFQ builder: the guided co-pilot from rfx_copilot.ipynb as an API.
 
-The buyer chats with 'Pro'; every tool call streams the updated RFQ (Server-Sent Events) so the page redraws live.
+The buyer chats with 'Ana'; every tool call streams the updated RFQ (Server-Sent Events) so the page redraws live.
 Finalise locks the RFQ and prints one PDF; only then can it be emailed (Gmail SMTP) or downloaded.
 State is one JSON file under STATE_DIR/live. Settings: ~/.config/aerchain/smtp.env or SMTP_* env vars.
 """
@@ -86,7 +86,7 @@ def search_internet(query):
 
 
 
-SYSTEM_PROMPT = """You are 'Pro', a helpful, efficient procurement copilot at Role Discovery. Your persona is sharp, friendly, and concise. You ALWAYS respond in very short messages (1-3 sentences max).
+SYSTEM_PROMPT = """You are 'Ana', a helpful, efficient procurement copilot at Role Discovery. Your persona is sharp, friendly, and concise. You ALWAYS respond in very short messages (1-3 sentences max).
 Your job is to actively guide the user to build a complete RFx step-by-step. Do not let them just search and leave. Guide them through these steps, one at a time:
 1. Scope: Ask what the overarching goal of the procurement is. Use set_rfx_scope to save it.
 2. Line Items: Help them search the catalog. Use add_to_rfx to save items.
@@ -398,6 +398,7 @@ def post_message(rid: str, body: MessageIn, request: Request):
     def stream():
         with _lock:
             msgs = st["messages"] or [{"role": "system", "content": SYSTEM_PROMPT}]
+            msgs[0] = {"role": "system", "content": SYSTEM_PROMPT}      # always the current prompt, also for drafts started earlier
             msgs.append({"role": "user", "content": text})
             st["chat"].append({"role": "user", "text": text})
             yield _sse("rfx", view(st, request))

@@ -1,4 +1,4 @@
-// Live RFQ (C10): chat with Pro on the right, the RFQ redrawing in the centre as the agent calls its tools.
+// Live RFQ (C10): chat with Ana on the right, the RFQ redrawing in the centre as the agent calls its tools.
 // Finalise locks the RFQ and prints the PDF; only then can it be emailed to typed addresses or downloaded.
 import { h, api, toast, modal, download, istDateTime } from '../components.js';
 
@@ -12,9 +12,9 @@ export async function render(root) {
   const chatLog = h('div', { class: 'stack', style: { flex: 1, overflow: 'auto', gap: '10px', paddingRight: '4px' } });
   const input = h('input', { class: 'full', placeholder: 'Describe what you need to buy…', style: { flex: 1 } });
   const sendBtn = h('button', { class: 'btn primary' }, 'Send');
-  const typing = h('div', { class: 'small muted', style: { visibility: 'hidden' } }, 'Pro is working…');
+  const typing = h('div', { class: 'small muted', style: { visibility: 'hidden' } }, 'Ana is working…');
   const chat = h('div', { class: 'card', style: { display: 'flex', flexDirection: 'column', gap: '12px', height: 'calc(100vh - 120px)', position: 'sticky', top: 0 } },
-    h('div', { class: 'row', style: { justifyContent: 'space-between' } }, h('div', { class: 'h5' }, 'Pro'), h('span', { class: 'pill xs tone-indigo' }, 'CO-PILOT')),
+    h('div', { class: 'row', style: { justifyContent: 'space-between' } }, h('div', { class: 'h5' }, 'Ana'), h('span', { class: 'pill xs tone-indigo' }, 'CO-PILOT')),
     chatLog, typing, h('div', { class: 'row', style: { flexWrap: 'nowrap' } }, input, sendBtn));
   root.replaceChildren(h('div', { style: { display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 380px', gap: '24px', alignItems: 'start' } }, centre, chat));
 
@@ -24,7 +24,7 @@ export async function render(root) {
       : h('div', { class: 'card tight chat-msg', style: { maxWidth: '100%', ...(m.error ? { background: 'var(--err-bg)' } : {}) } }, m.text);
   }
   function drawChat() {
-    const welcome = v.chat.length ? [] : [h('div', { class: 'card tight' }, 'Hey there! I’m Pro. Tell me what you need to buy and I’ll build the RFQ as we talk.')];
+    const welcome = v.chat.length ? [] : [h('div', { class: 'card tight' }, 'Hey there! I’m Ana. Tell me what you need to buy and I’ll build the RFQ as we talk.')];
     chatLog.replaceChildren(...welcome, ...v.chat.map(bubble));
     chatLog.scrollTop = chatLog.scrollHeight;
     const locked = v.status !== 'DRAFT';

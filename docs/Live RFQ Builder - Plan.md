@@ -1,6 +1,6 @@
 # Live RFQ Builder: plan
 
-Build the RFQ by chatting with the agent ("Pro"). The RFQ updates live in the centre while the chat runs on the right. Instead of typing "END", the buyer clicks **Finalise RFQ**. Only after that can the RFQ be emailed or downloaded.
+Build the RFQ by chatting with the agent ("Ana"). The RFQ updates live in the centre while the chat runs on the right. Instead of typing "END", the buyer clicks **Finalise RFQ**. Only after that can the RFQ be emailed or downloaded.
 
 - Agent source: `GuidedCopilot` in `Build/rfx_copilot.ipynb`
 - Design: `Documents/Designs/Design System.dc.html` (its colours and fonts are already in `Build/web/tokens.css`)
@@ -9,7 +9,7 @@ Build the RFQ by chatting with the agent ("Pro"). The RFQ updates live in the ce
 ## Layout
 
 ```
-┌ ShellNav ┬──────── RFQ (live) ─────────┬──── Chat with Pro ────┐
+┌ ShellNav ┬──────── RFQ (live) ─────────┬──── Chat with Ana ────┐
 │          │ Title / scope               │ messages…             │
 │          │ Line items table            │                       │
 │          │ Questionnaire               │ [ type a message ]    │
@@ -24,7 +24,7 @@ Build the RFQ by chatting with the agent ("Pro"). The RFQ updates live in the ce
 - Routes:
   - `POST /api/live/messages` streams Server-Sent Events:
     - an `rfx` event with the full state after **each** tool call (`set_rfx_scope`, `add_to_rfx`, `remove_from_rfx`, `set_questionnaire`), so the RFQ changes while the agent is still working
-    - a `reply` event with Pro's text at the end of the turn
+    - a `reply` event with Ana's text at the end of the turn
   - `GET /api/live/rfx`: current state, used on page load
   - `POST /api/live/reset`: start a new draft
 

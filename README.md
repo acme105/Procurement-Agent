@@ -2,7 +2,7 @@
 
 Take-home prototype for "Kill the Quote Spreadsheet". Two parts of one flow:
 
-1. **Live RFQ**: talk an RFQ into existence with an AI co-pilot ("Pro"); it fills in scope, line items and supplier
+1. **Live RFQ**: talk an RFQ into existence with an AI co-pilot ("Ana"); it fills in scope, line items and supplier
    questions live. **Finalise** locks it and prints the PDF; then email it to addresses you type, download the PDF, or
    copy a shareable vendor upload link. Vendors upload one quote file under their organisation name.
 2. **Compare quotes**: reads every proposal (PDF, photo, Excel, Word, text) against the RFQ's own lines, normalises
