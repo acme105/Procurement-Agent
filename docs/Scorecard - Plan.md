@@ -1,5 +1,13 @@
 # Weighted scorecard: plan
 
+> **Status: built and deployed** (releases `82f72b2` and `8d36fa3`). Differences from the plan below:
+> - Weights a buyer states hold exactly ("price 70" is 70 of 100); only the model's own picks are relative. Relations to a fixed criterion fix the other criterion too. The plan's simpler "scale everything" rule gave wrong answers in testing.
+> - The standard-weights prompt asks the model to think in groups (price, delivery, questionnaire) so that nine questions cannot outweigh price.
+> - Re-read time estimates depend on file type (scans and photos take minutes), and a vendor that times out is flagged and retried rather than scored as failed.
+> - Custom-criterion scores are stored per rubric, which is what lets the version picker show an earlier version with its own scores.
+> - The version picker (view read-only, make current) was built after the first release, as planned.
+> - A **Score / Cost** toggle on Summary and a `scorecard` table were added. Defaults in section 13 were accepted as proposed.
+
 Replace the cost-only ranking with a **weighted scorecard** that the buyer can reshape in the analyst chat at run time. The model proposes a standard scorecard from the RFQ, the buyer adjusts weights (as numbers or as relations), adds or changes criteria, and sets minimum scores that can fail a vendor. Rescoring that needs the vendors' documents re-read happens only when a criterion changes, and only after the buyer approves it.
 
 Builds on: the comparison engine (`app/live_compare.py`), the analyst (`app/live_analyst.py`) and the Compare quotes page (`web/views/compare-live.js`).

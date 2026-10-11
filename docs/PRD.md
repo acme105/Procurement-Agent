@@ -1,6 +1,6 @@
 # Procurement: Product Requirements Document
 
-Scope of this document: the product exactly as deployed (release `9514b60`, a single-tenant app on one Hetzner server). Anything not deployed is listed under [Out of scope](#9-out-of-scope). A companion document, [TRD.md](TRD.md), covers the technical design.
+Scope of this document: the product exactly as deployed (release `8d36fa3`, a single-tenant app on one Hetzner server). Anything not deployed is listed under [Out of scope](#9-out-of-scope). A companion document, [TRD.md](TRD.md), covers the technical design.
 
 ## 1. Goal
 
@@ -39,6 +39,10 @@ The product has one login (the buyer) and one open page (the vendor upload page)
 | Buyer | See who replied | Send log with per-recipient status; "Quotes received" list by organisation with downloadable files |
 | Buyer | Read any quote format | Extraction from PDF, image, Excel, Word, CSV, HTML and text against the RFQ's lines and questions |
 | Buyer | Know which vendors are compliant | Compliance verdict per vendor with named reasons (see section 6) |
+| Buyer | Rank vendors on what matters for this purchase, not just price | A scorecard (price, lead time, each question, custom criteria) with weights proposed from the RFQ; the buyer restates weights in chat and they hold exactly |
+| Buyer | Reward or penalise detail (for example a delivery plan that names the origin and dates) | A custom criterion with a rubric and an optional minimum score that fails a vendor |
+| Buyer | Control cost and time before documents are re-read | Weight and minimum changes recompute instantly; a new rubric asks first (Proceed or Cancel) and says roughly how long it takes |
+| Buyer / Approver | See how a ranking came about and compare views | Scorecard tab with every score, reason and quote; version picker; Score or Cost ranking toggle |
 | Buyer | Find the cheapest split | Single-source ranking and cherry-pick (cheapest compliant vendor per line), with saving versus the best single source |
 | Buyer / Approver | Trust a number | Click a vendor to open its original document in a zoomable viewer; extraction confidence on every row; the evidence behind each answer |
 | Buyer | Answer the manager's what-if | Ana re-runs scenarios: exclude vendors, change the exchange rate or QA threshold, and saves the result as a table |
@@ -78,7 +82,10 @@ Buyer chats with Ana  ->  Finalise (PDF printed, RFQ locked)  ->  Send by email 
   RFQ redraws live                                      Vendors upload one file each via /q/<token>
                                                                            |
                                                                            v
-   Buyer asks Ana  <-  Compare quotes (extract, normalise, verdicts, tables)  <-  Run comparison
+  Run comparison  ->  extract, normalise, verdicts  ->  starting scorecard proposed from the RFQ  ->  tables
+                                                                           |
+                                                                           v
+   Buyer asks Ana: questions, what-ifs, new parameters, weights and criteria (approval before any re-read)
 ```
 
 ## 6. Business rules (the contract the comparison enforces)
@@ -120,6 +127,13 @@ Buyer chats with Ana  ->  Finalise (PDF printed, RFQ locked)  ->  Send by email 
 | PDF printing fails | Finalise is refused with an error; the RFQ stays editable |
 | One proposal cannot be read | That proposal shows FAILED with the error; the run completes for the others; it can be re-run |
 | Model returns different readings on a re-run | Possible (see 10); extraction is cached by input so an unchanged re-run is stable, and the run records which cache entries it used |
+| Buyer gives weights that add up to more than 100, or two relations that contradict each other | Refused with an explanation; nothing is saved; Ana asks which to keep |
+| Buyer states a weight and also a relation to it | The number holds exactly and the relation fixes the related criterion; the rest share what is left |
+| New rubric proposed, buyer says anything but yes (or presses Cancel) | Nothing is re-read; the scorecard stays on the current version |
+| A document cannot be read while scoring a rubric (timeout, unreadable) | That vendor is flagged "could not be scored" with a score of 0 for the total, not failed on the minimum, and is retried on the next run or an approved retry |
+| A vendor does not state a lead time or skips a question | Scores 0 on that criterion and is flagged "not stated" |
+| A rubric depends on detail the extraction summarised away | Rubric criteria re-read the vendor's original document, not the summary |
+| Buyer wants an earlier scorecard back | Version picker: view it read-only with its own scores, or make it current (saved as a new version) |
 | Analyst asked something the tables do not hold | Ana says so and offers to read it from the proposals as a new parameter |
 | Server restarts mid-run | Known issue: the interrupted run stays marked "running" and the app refuses to start another run until the operator marks it failed (see 10) |
 
@@ -137,7 +151,7 @@ The product does not have an analytics dashboard. This table separates what the 
 | Share of rows with Low confidence | G4: how much human checking is needed | Line items table (confidence column) | Recorded per run |
 | Compliance pass rate; top fail reasons | Quality of vendor responses | Vendor summary table | Recorded per run |
 | Cherry-pick saving versus best single source (₹ and %) | The value the comparison delivers | Run summary | Recorded per run |
-| Extraction time per run; model calls, tokens, cache hits | Cost and speed of G3 | Model-call log (duration, tokens, cached, status) | Recorded for extraction and parameter reads |
+| Extraction time per run; model calls, tokens, cache hits | Cost and speed of G3 | Model-call log (duration, tokens, cached, status) | Recorded for extraction, parameter reads, scorecard proposals and criterion scoring |
 | Analyst questions per RFQ; share answered from a table query | G5: adoption and grounding | Saved analyst chat | Derivable; tool use is not counted |
 | Scorecard versions per RFQ; weight and minimum changes; pending changes proposed, approved, cancelled | Adoption of the scorecard and how often buyers override the model's weights | Scorecard version files and the pending-change file | Recorded |
 | How often the top vendor by score differs from the top by cost | Whether the scorecard changes decisions | Run summary (top by score, top by cost) | Recorded per run |
@@ -164,6 +178,7 @@ Not built, not deployed, and not implied by the product:
 | Limitation | Effect | Mitigation today |
 | --- | --- | --- |
 | Extraction is model-based and not deterministic | The same file can be read differently on different runs (observed on one vendor, where a total moved from ₹10.9 crore to ₹8.0 crore) | Cached by input; low-confidence flags; original document one click away. A measured accuracy set is out of scope |
+| The starting weights are the model's judgement of the RFQ | A buyer may disagree with the standard | The buyer's own weights and relations override it, and each change is a saved version |
 | Custom-criterion scores come from the model reading the document | The same document can score differently between fresh readings; re-reading scans and photos is slow (minutes) and can time out | Scores are cached per rubric and file; each score shows its reason and a quote; a timed-out vendor is flagged and retried, not failed; the buyer is told the time estimate first |
 | Substitutions inside a matched line are not detected | A vendor offering a close but different spec could pass | Specs are visible in the document and can be asked of Ana |
 | One shared login | No individual accountability | Behind HTTPS; the credential is held only by the operator and buyer |
@@ -178,3 +193,5 @@ Not built, not deployed, and not implied by the product:
 2. Should a substitution inside a matched line be detected (requires a per-row "differs from the RFQ" field in the extraction)?
 3. Who may see which RFQs once more than one buyer uses it?
 4. What accuracy is acceptable for a ₹4 crore decision, and who signs off the evaluation set?
+5. Should price and lead time be scored relative to the best vendor (today) or against a target stated in the RFQ?
+6. Should a criterion minimum apply to a vendor that gave one blanket answer to all questions (today it scores that answer for every question)?

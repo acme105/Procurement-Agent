@@ -1,6 +1,6 @@
 # Procurement: Technical Requirements Document
 
-Describes the system as deployed (release `9514b60`). Product context, personas and business rules are in [PRD.md](PRD.md). Where this document says "not built", it means it does not exist in the deployed release.
+Describes the system as deployed (release `8d36fa3`, 33 API operations). Product context, personas and business rules are in [PRD.md](PRD.md). Where this document says "not built", it means it does not exist in the deployed release.
 
 ## 1. Summary
 
@@ -143,8 +143,11 @@ The static front end (`/web/…`) is also behind the buyer login. The vendor pag
 2. **Extract** (section 6) into `extractions/P*.json`.
 3. **Normalise and join** (`compute`): currency to INR, "box of N" to pieces, rows joined to RFQ lines by line number.
 4. **Verdicts:** per vendor, coverage by RFQ line (missing and under-quoted lines, named by item and line range); items and locations that match no RFQ line; questionnaire style and score; flags (blanket answer, bundle conditions, low-confidence rows, extra locations).
-5. **Scenarios:** single-source ranking after discount; cherry-pick among compliant vendors without bundle conditions.
-6. **Save** the tables as Parquet; update `latest.txt`.
+5. **Scorecard** (`live_scorecard.apply`): each criterion is scored 0–10 per vendor (price and lead time by formula against the best vendor; each question from its extracted answer score; rubric criteria from stored model scores for the current rubric), weighted to a score out of 100. Criterion minimums add named failures; a criterion that could not be scored is flagged, not failed. Vendors are ranked: passing first, then score, then cost; the cost-only rank is kept alongside.
+6. **Scenarios:** single-source ranking after discount; cherry-pick among compliant vendors without bundle conditions (price per line, unchanged by the scorecard).
+7. **Save** the tables as Parquet (including `scorecard.parquet`); update `latest.txt`.
+
+During a run, before the tables are built, the starting scorecard is created if the RFQ has none, and any rubric criterion without a current score for some proposal is scored (pressing Run is the approval for that). Changing weights or minimums later rebuilds the latest run's tables from saved data with no model calls (`rebuild_tables`).
 
 A run executes in a background thread. Only one run may be in progress per RFQ.
 
@@ -166,6 +169,7 @@ A run executes in a background thread. Only one run may be in progress per RFQ.
 | Secrets | Model key, SMTP credentials and the buyer password live in a root-only file read by systemd; none are in the repository (`.gitignore`, `.env.example`, scan before each push) | Secrets are not rotated automatically |
 | Uploads | Type allow-list (pdf, xlsx, xls, csv, docx, doc, png, jpg, jpeg, txt), 20 MB, filename sanitised, stored outside the web root | No malware scan; no per-IP limit |
 | Output encoding | Vendor-supplied text is escaped before it is shown; chat markdown is escaped first | None known |
+| Cost control on re-reading | A new or changed rubric needs the buyer's approval, enforced in code: the Proceed button, or an affirmative reply sent after the proposal (`apply_pending` is refused otherwise) | A buyer who says yes to a vague question approves it |
 | Prompt injection | Vendor documents are untrusted model input. Output is schema-constrained, and the analyst can only read the run's tables and cannot run code or send mail | A hostile document could still skew what is extracted for that vendor |
 | Data sent out | Proposal content goes to the OpenAI API; the co-pilot may send search text to Wikipedia | Needs a policy decision for real vendor data |
 
@@ -183,7 +187,7 @@ A run executes in a background thread. Only one run may be in progress per RFQ.
 | Certificate | Let's Encrypt via certbot (webroot), renewal timer, deploy hook that reloads nginx for this certificate |
 | DNS | A free DuckDNS subdomain pointing at the VM |
 | Update | `sudo -u aerchain git -C /opt/aerchain pull` then `systemctl restart aerchain` (static front-end files need no restart) |
-| Observed | Idle memory about 116 MB; demo state about 17 MB; disk 88% used (shared with other products) |
+| Observed | Service memory about 83 MB at rest (cap 1.2 GB); demo state about 17 MB; disk 89% used, 4.1 GB free (shared with other products) |
 
 **Repository layout** (public on GitHub): `app/`, `web/`, `data/catalog.csv`, `samples/` (demo RFQ and 8 fabricated proposals), `scripts/seed_demo.py`, `deploy/` (setup script, service unit, nginx example), `docs/`, `tests/`.
 
@@ -192,6 +196,7 @@ A run executes in a background thread. Only one run may be in progress per RFQ.
 | Aspect | Today |
 | --- | --- |
 | Extraction time | About 2 minutes for 8 proposals (4 at a time), dominated by model latency; a cached re-run is near-instant |
+| Scorecard | Starting weights: one call, a few seconds. Weight and minimum changes: under a second, no model calls. Re-reading for a new rubric: about 10–40 s for text documents but minutes for scans and photos (observed 3–4 min each, one timeout), four at a time |
 | Chat latency | First update after a tool call within a few seconds; updates stream as each tool finishes |
 | Email | About 5–10 s setup plus 3 s per message, in the background; the page shows live status |
 | Capacity | Designed for one buyer and tens of RFQs; not load-tested |
@@ -225,4 +230,4 @@ Not built and not deployed: a database, a job queue, multiple workers or servers
 
 - **Code:** `pytest -q` (22 tests, no network).
 - **Deployed release:** `git log -1` in `/opt/aerchain` and `systemctl is-active aerchain`; `GET /api/health` (behind the login) returns the model and whether email, the catalog and the model key are configured.
-- **End to end:** `python -m scripts.seed_demo` loads the demo RFQ and proposals; Run comparison on that RFQ should produce 5 of 8 vendors compliant, with headline figures within the model's run-to-run variation.
+- **End to end:** `python -m scripts.seed_demo` loads the demo RFQ and proposals; Run comparison on that RFQ should produce 5 of 8 vendors compliant, with headline figures within the model's run-to-run variation, and a starting scorecard (version 1) announced in the analyst chat. `GET …/scorecard` returns it; the Scorecard tab and the Score/Cost toggle on Summary should agree with the saved tables.
