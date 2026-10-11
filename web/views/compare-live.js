@@ -49,7 +49,7 @@ export async function render(root) {
     return;
   }
   let home = null, runId = null, run = null, tab = 'vendor_summary', derivedSel = null, chat = [], busy = false, polling = false;
-  let rankBy = 'score', pending = [], scInfo = null, approving = null;
+  let rankBy = 'score', pending = [], scInfo = null, approving = null, viewVer = null, viewData = null;
 
   const left = h('div', { class: 'cmp-left' });
   const chatLog = h('div', { class: 'stack', style: { flex: 1, overflow: 'auto', gap: '10px', paddingRight: '4px' } });
@@ -71,6 +71,7 @@ export async function render(root) {
   }
 
   async function load({ keepRun = false } = {}) {
+    viewVer = null; viewData = null;
     home = await api(`/api/live/rfqs/${rid}/compare`);
     if (!keepRun || !runId) runId = home.latest || (home.runs.length ? home.runs[home.runs.length - 1].run_id : null);
     run = runId ? await api(`/api/live/rfqs/${rid}/runs/${runId}`) : null;
@@ -299,26 +300,46 @@ export async function render(root) {
   }
 
   function scorecardBody(t) {
-    const sc = scInfo && scInfo.version ? scInfo : null;
-    const rows = t.scorecard || [];
-    if (!sc || !rows.length) return h('div', { class: 'card empty' }, 'No scorecard yet. Press Run comparison and I will propose one from the RFQ.');
-    const vendors = (t.vendor_summary || []).map(r => r.Vendor);
-    const summary = Object.fromEntries((t.vendor_summary || []).map(r => [r.Vendor, r]));
-    const cell = (c, v) => rows.find(r => r['Criterion Id'] === c.id && r.Vendor === v);
+    const cur = scInfo && scInfo.version ? scInfo : null;
+    if (!cur || !(t.scorecard || []).length) return h('div', { class: 'card empty' }, 'No scorecard yet. Press Run comparison and I will propose one from the RFQ.');
+    if (viewVer === cur.version) { viewVer = null; viewData = null; }
+    const old = viewVer && viewData ? viewData : null;                       // an earlier version, shown read-only with its own scores
+    const crits = old ? old.scorecard.criteria : cur.criteria;
+    const scoreRows = old ? old.scorecard_table : (t.scorecard || []);
+    const vsum = old ? old.vendor_summary : (t.vendor_summary || []);
+    const vendors = vsum.map(r => r.Vendor);
+    const summary = Object.fromEntries(vsum.map(r => [r.Vendor, r]));
+    const meta = old ? old.scorecard : cur;
+    const cell = (c, v) => scoreRows.find(r => r['Criterion Id'] === c.id && r.Vendor === v);
     const cls = (s) => s >= 8 ? 'sc-hi' : s >= 5 ? 'sc-mid' : 'sc-lo';
-    const head = h('div', { class: 'small muted' }, `Scorecard version ${sc.version} · set by ${sc.author === 'model' ? 'the model from the RFQ' : 'you in chat'}${sc.note ? ` · ${sc.note}` : ''} · `,
-      'tell Ana what matters more, or add a criterion; ', h('span', {}, `${sc.versions.length} version${sc.versions.length > 1 ? 's' : ''} saved`));
-    return h('div', { class: 'fill' }, head, h('div', { class: 'cmp-table' }, h('table', { class: 'grid' },
-      h('thead', {}, h('tr', {}, h('th', { class: 'fz', style: FZ(280, 0) }, 'Criterion'), h('th', { class: 'num' }, 'Weight'), h('th', { class: 'num' }, 'Min'),
-        ...vendors.map(v => h('th', { class: 'num' }, vendorLink(v))))),
-      h('tbody', {},
-        ...sc.criteria.map(c => h('tr', {},
-          h('td', { class: 'fz fz-last wrap', style: FZ(280, 0), title: c.reason || '' }, h('b', {}, c.name), c.rubric ? h('div', { class: 'small muted' }, `Rubric: ${c.rubric}`) : (c.reason ? h('div', { class: 'small muted' }, c.reason) : null)),
-          h('td', { class: 'num' }, `${(+c.weight).toFixed(1)}`), h('td', { class: 'num' }, c.min_score == null ? '—' : c.min_score),
-          ...vendors.map(v => { const r = cell(c, v); return r ? h('td', { class: `num ${cls(r.Score)}`, title: `${r.Reason || ''}${r.Quote ? ` — “${r.Quote}”` : ''}` }, r.Score.toFixed(1), r.Source === 'document' ? h('span', { class: 'small', style: { marginLeft: '4px' } }, '▤') : null) : h('td', {}, '—'); }))),
-        h('tr', { class: 'sc-total' }, h('td', { class: 'fz fz-last', style: FZ(280, 0) }, h('b', {}, 'Score / 100')), h('td', { class: 'num' }, sc.criteria.reduce((a, c) => a + +c.weight, 0).toFixed(0)), h('td', {}),
-          ...vendors.map(v => h('td', { class: 'num' }, h('b', {}, summary[v] && summary[v]['Score / 100'] != null ? summary[v]['Score / 100'].toFixed(1) : '—'),
-            summary[v] ? h('div', {}, h('span', { class: `pill xs ${summary[v]['Compliance Status'] === 'PASS' ? 'tone-success' : 'tone-error'}` }, summary[v]['Compliance Status'])) : null)))))));
+    const picker = h('select', { class: 'inline', 'aria-label': 'Scorecard version', style: { maxWidth: '100%' }, onchange: async (e) => {
+      const n = Number(e.target.value);
+      if (n === cur.version) { viewVer = null; viewData = null; return drawLeft(); }
+      try { viewData = await api(`/api/live/rfqs/${rid}/runs/${runId}/scorecard/${n}`); viewVer = n; } catch (err) { toast(err.message); viewVer = null; viewData = null; }
+      drawLeft();
+    } }, ...cur.versions.slice().reverse().map(v => h('option', { value: v.version, selected: (old ? viewVer : cur.version) === v.version },
+      `Version ${v.version}${v.version === cur.version ? ' (current)' : ''} · ${v.author === 'model' ? 'model' : 'you'} · ${istDateTime(v.created_at, { year: false })}${v.note ? ` · ${String(v.note).slice(0, 50)}` : ''}`)));
+    const bar = h('div', { class: 'row', style: { gap: '10px', flexWrap: 'wrap' } }, picker,
+      old ? h('span', { class: 'pill xs tone-warning' }, 'READ-ONLY · NOT CURRENT') : h('span', { class: 'small muted' }, 'Tell Ana what matters more, or add a criterion.'),
+      old ? h('button', { class: 'btn primary flat sm', onclick: async () => {
+        try {
+          scInfo = await api(`/api/live/rfqs/${rid}/scorecard/${viewVer}/restore`, { method: 'POST' });
+          viewVer = null; viewData = null; run = await api(`/api/live/rfqs/${rid}/runs/${runId}`); toast('Restored as the current scorecard'); drawLeft();
+        } catch (err) { toast(err.message); }
+      } }, `Make version ${viewVer} current`) : null,
+      old ? h('button', { class: 'btn sm', onclick: () => { viewVer = null; viewData = null; drawLeft(); } }, 'Back to current') : null);
+    return h('div', { class: 'fill' }, bar, h('div', { class: 'small muted' }, `Version ${meta.version} · set by ${meta.author === 'model' ? 'the model from the RFQ' : 'you in chat'}${meta.note ? ` · ${meta.note}` : ''}`),
+      h('div', { class: 'cmp-table' }, h('table', { class: 'grid' },
+        h('thead', {}, h('tr', {}, h('th', { class: 'fz', style: FZ(280, 0) }, 'Criterion'), h('th', { class: 'num' }, 'Weight'), h('th', { class: 'num' }, 'Min'),
+          ...vendors.map(v => h('th', { class: 'num' }, vendorLink(v))))),
+        h('tbody', {},
+          ...crits.map(c => h('tr', {},
+            h('td', { class: 'fz fz-last wrap', style: FZ(280, 0), title: c.reason || '' }, h('b', {}, c.name), c.rubric ? h('div', { class: 'small muted' }, `Rubric: ${c.rubric}`) : (c.reason ? h('div', { class: 'small muted' }, c.reason) : null)),
+            h('td', { class: 'num' }, `${(+c.weight).toFixed(1)}`), h('td', { class: 'num' }, c.min_score == null ? '—' : c.min_score),
+            ...vendors.map(v => { const r = cell(c, v); return r ? h('td', { class: `num ${cls(r.Score)}`, title: `${r.Reason || ''}${r.Quote ? ` — “${r.Quote}”` : ''}` }, r.Score.toFixed(1), r.Source === 'document' ? h('span', { class: 'small', style: { marginLeft: '4px' } }, '▤') : null) : h('td', {}, '—'); }))),
+          h('tr', { class: 'sc-total' }, h('td', { class: 'fz fz-last', style: FZ(280, 0) }, h('b', {}, 'Score / 100')), h('td', { class: 'num' }, crits.reduce((a, c) => a + +c.weight, 0).toFixed(0)), h('td', {}),
+            ...vendors.map(v => h('td', { class: 'num' }, h('b', {}, summary[v] && summary[v]['Score / 100'] != null ? summary[v]['Score / 100'].toFixed(1) : '—'),
+              summary[v] ? h('div', {}, h('span', { class: `pill xs ${summary[v]['Compliance Status'] === 'PASS' ? 'tone-success' : 'tone-error'}` }, summary[v]['Compliance Status'])) : null)))))));
   }
 
   function pendingCard(p) {

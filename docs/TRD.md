@@ -75,7 +75,7 @@ state/
         scorecard/
           v1.json, v2.json, …        versions: criteria, weights, minimums, rubrics, author, note
           current.txt  pending.json  current version; changes awaiting approval
-          scores/<criterion>.json    per-vendor scores for rubric-scored criteria
+          scores/<criterion>__<rubric>.json   per-vendor scores for a rubric, so every version keeps its own scores
         R-NNN/
           manifest.json              run record (below)
           extractions/P*.json        one structured extraction per proposal
@@ -110,7 +110,9 @@ All paths are under one origin. "Buyer" means the Basic-auth login is required w
 | `POST …/{id}/proposals`, `DELETE …/proposals/{n}` | Buyer | Add a proposal on a vendor's behalf; remove one |
 | `POST …/{id}/runs`, `GET …/runs/{run}`, `GET …/runs/{run}/tables/{name}?format=csv\|xlsx` | Buyer | Start a run; progress and tables; table download |
 | `GET …/proposals/{n}/view`, `…/pages/{p}.png`, `GET …/rfq/view`, `…/rfq/pages/{p}.png` | Buyer | Viewer data and page images |
-| `GET …/{id}/scorecard` | Buyer | Current version, criteria, versions, pending changes |
+| `GET …/{id}/scorecard`, `GET …/{id}/scorecard/{n}` | Buyer | Current version, criteria, versions, pending changes; one version |
+| `POST …/{id}/scorecard/{n}/restore` | Buyer | Make an earlier version current, saved as a new version |
+| `GET …/{id}/runs/{run}/scorecard/{n}` | Buyer | The run's ranking under an earlier version, computed on the fly (saves nothing) |
 | `POST …/analyst/pending/{pid}/approve`, `…/cancel` | Buyer | Approve (streams progress as proposals are re-read) or cancel a pending rubric change |
 | `GET …/{id}/analyst`, `POST …/analyst/messages`, `POST …/analyst/reset` | Buyer | Analyst chat; the message response is SSE (`chat`, `tool`, `tables`, `open`, `done`) |
 
@@ -196,7 +198,7 @@ A run executes in a background thread. Only one run may be in progress per RFQ.
 | Availability | Single process, no failover; systemd restarts it on failure |
 | Backup | None; state is on one disk |
 | Observability | systemd journal for the service; the model-call log; per-run and per-recipient status in the state files. No metrics endpoint, tracing or alerting |
-| Tests | 21 pytest tests, none call a model: compliance rules (including unrequested and missing items), one file per organisation, upload and finalise rules, the analyst's table query tool, route and login tests, a check that the front end holds no references to removed code, and the scorecard (formulas, weights and relations, minimums, ranking, the approval guard, failed-scoring retry, time estimates) |
+| Tests | 22 pytest tests, none call a model: compliance rules (including unrequested and missing items), one file per organisation, upload and finalise rules, the analyst's table query tool, route and login tests, a check that the front end holds no references to removed code, and the scorecard (formulas, weights and relations, minimums, ranking, the approval guard, failed-scoring retry, time estimates, versions and restore) |
 
 ## 12. Known technical issues and debt
 
@@ -213,7 +215,7 @@ A run executes in a background thread. Only one run may be in progress per RFQ.
 | 9 | Chrome runs without its sandbox | Printing a hostile document's text is the only exposure (the HTML is generated from escaped text) | Run Chrome in a container or with user namespaces |
 | 10 | Model cache and run log grow without bound | Disk is shared and at 88% | Retention policy and cache pruning |
 | 11 | Re-reading scans and photos for a new rubric is slow and can time out | A vendor is scored 0 and flagged until retried; the time estimate can be off | Estimates are by file type; failed vendors are retried on the next run or an approved retry; a faster document path for scans would help |
-| 12 | Custom-criterion scores are a model judgement | Not reproducible across fresh readings | Reason and quote shown; an evaluation set is out of scope |
+| 12 | Custom-criterion scores are a model judgement; an older version shows scores only if that rubric was scored | Not reproducible across fresh readings | Reason and quote shown; an evaluation set is out of scope |
 
 ## 13. Out of scope (technical)
 
@@ -221,6 +223,6 @@ Not built and not deployed: a database, a job queue, multiple workers or servers
 
 ## 14. Verification
 
-- **Code:** `pytest -q` (21 tests, no network).
+- **Code:** `pytest -q` (22 tests, no network).
 - **Deployed release:** `git log -1` in `/opt/aerchain` and `systemctl is-active aerchain`; `GET /api/health` (behind the login) returns the model and whether email, the catalog and the model key are configured.
 - **End to end:** `python -m scripts.seed_demo` loads the demo RFQ and proposals; Run comparison on that RFQ should produce 5 of 8 vendors compliant, with headline figures within the model's run-to-run variation.

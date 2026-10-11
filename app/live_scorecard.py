@@ -157,12 +157,16 @@ def describe(sc: dict) -> str:
 
 # ---- scoring a criterion for every vendor (formulas, answers, or re-reading the documents) -------------
 
-def _scores_file(rid: str, crit_id: str) -> Path:
-    return sdir(rid) / "scores" / f"{crit_id}.json"
+def _scores_file(rid: str, crit: dict) -> Path:
+    """Scores are kept per criterion AND rubric, so every scorecard version keeps its own numbers."""
+    return sdir(rid) / "scores" / f"{crit['id']}__{(rubric_hash(crit) or 'none')[:12]}.json"
 
 
-def load_custom(rid: str, crit_id: str) -> dict:
-    f = _scores_file(rid, crit_id)
+def load_custom(rid: str, crit: dict) -> dict:
+    f = _scores_file(rid, crit)
+    legacy = sdir(rid) / "scores" / f"{crit['id']}.json"          # saved before scores were keyed by rubric
+    if not f.exists() and legacy.exists() and json.loads(legacy.read_text()).get("rubric_hash") == rubric_hash(crit):
+        f = legacy
     data = json.loads(f.read_text()) if f.exists() else {}
     for item in data.get("items", {}).values():                 # results saved before the failed flag existed
         if str(item.get("reason", "")).startswith("Could not be scored"):
@@ -188,7 +192,7 @@ def apply(rid: str, vsum: pd.DataFrame, qdf: pd.DataFrame, version: Optional[int
             raw = score = reason = quote = None
             source = "formula"
             if (c.get("rubric") or "").strip():                       # custom rubric: scored by re-reading the document
-                stored = load_custom(rid, c["id"])
+                stored = load_custom(rid, c)
                 hit = stored.get("items", {}).get(L.org_key(vendor)) if stored.get("rubric_hash") == rubric_hash(c) else None
                 source = "document"
                 if hit:
@@ -371,7 +375,7 @@ def estimate_seconds(rid: str, props: list[dict]) -> int:
 
 def needs_scoring(rid: str, crit: dict, props: list[dict]) -> list[dict]:
     """Proposals with no good score for this rubric: all of them if the rubric is new or changed, else the missing or failed ones."""
-    stored = load_custom(rid, crit["id"])
+    stored = load_custom(rid, crit)
     if stored.get("rubric_hash") != rubric_hash(crit):
         return props
     items = stored.get("items", {})
@@ -463,7 +467,7 @@ def score_criterion(rid: str, crit: dict, on_progress: Optional[Callable[[int, i
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
         list(ex.map(one, props))
-    f = _scores_file(rid, crit["id"])
+    f = _scores_file(rid, crit)
     f.parent.mkdir(parents=True, exist_ok=True)
     f.write_text(json.dumps({"rubric_hash": rubric_hash(crit), "scored_at": iso(config.real_now()), "items": items}, ensure_ascii=False, indent=1))
     return items
@@ -557,9 +561,17 @@ def remove_criterion(rid: str, ref: str) -> dict:
     c = find(sc, ref)
     if len(sc["criteria"]) <= 1:
         raise ValueError("A scorecard needs at least one criterion")
-    v = save_version(rid, [x for x in sc["criteria"] if x["id"] != c["id"]], "buyer", f"Removed {c['name']}")
-    _scores_file(rid, c["id"]).unlink(missing_ok=True)
-    return v
+    return save_version(rid, [x for x in sc["criteria"] if x["id"] != c["id"]], "buyer", f"Removed {c['name']}")
+
+
+def restore(rid: str, n: int) -> dict:
+    """Make an earlier version current again, as a new version (history is never rewritten)."""
+    old = load_version(rid, n)
+    if not old:
+        raise ValueError(f"No scorecard version {n}")
+    if current_version(rid) == n:
+        raise ValueError("That version is already current")
+    return save_version(rid, old["criteria"], "buyer", f"Restored version {n}")
 
 
 def typed_approval_ok(pend: dict, user_text: str, user_msgs: int) -> bool:
@@ -580,6 +592,39 @@ def overview(rid: str) -> dict:
 def get_scorecard(rid: str):
     L.load(rid)
     return overview(rid)
+
+
+@router.get("/api/live/rfqs/{rid}/scorecard/{n}")
+def get_version(rid: str, n: int):
+    L.load(rid)
+    v = load_version(rid, n)
+    if not v:
+        raise HTTPException(404, "No such scorecard version")
+    return v
+
+
+@router.post("/api/live/rfqs/{rid}/scorecard/{n}/restore")
+def restore_version(rid: str, n: int):
+    L.load(rid)
+    try:
+        restore(rid, n)
+    except ValueError as e:
+        raise HTTPException(409, str(e)) from e
+    rebuild(rid)
+    return overview(rid)
+
+
+@router.get("/api/live/rfqs/{rid}/runs/{run_id}/scorecard/{n}")
+def view_version(rid: str, run_id: str, n: int):
+    """The comparison as it would rank under an earlier scorecard version. Computed on the fly; saves nothing."""
+    L.load(rid)
+    v = load_version(rid, n)
+    if not v:
+        raise HTTPException(404, "No such scorecard version")
+    m = C.read_manifest(rid, run_id)
+    tables, _ = C.compute(rid, run_id, m["settings"], scorecard_version=n)
+    cols = [c for c in ("Rank", "Vendor", "Compliance Status", "Score / 100", "Fail Reasons") if c in tables["vendor_summary"].columns]
+    return {"scorecard": v, "vendor_summary": C.records(tables["vendor_summary"][cols]), "scorecard_table": C.records(tables["scorecard"])}
 
 
 @router.post("/api/live/rfqs/{rid}/analyst/pending/{pid}/cancel")

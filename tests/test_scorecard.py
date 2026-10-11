@@ -200,3 +200,29 @@ def test_estimate_is_longer_for_scans(state_dir, equal_weights):
     L.save(st)
     props = [{"n": 1}, {"n": 2}, {"n": 3}]
     assert SC.estimate_seconds(rid, props) >= 150 and SC.estimate_seconds(rid, [{"n": 2}]) <= 20
+
+
+def test_versions_keep_their_own_scores_and_can_be_restored(state_dir, equal_weights, monkeypatch):
+    rid = _setup(VENDORS)
+    SC.ensure_standard(rid)
+    monkeypatch.setattr(C, "read_parts", lambda path: [])
+    monkeypatch.setattr(C, "_upload_path", lambda rid, st, n: None)
+    level = {"s": 9.0}
+    monkeypatch.setattr(llm, "call", lambda *a, **k: (SC.CriterionScore(score=level["s"], reason="r", quote=None, confidence="High"), None))
+    SC.execute_pending(rid, SC.propose_criterion(rid, "Support", "10 if 24x7", 20, None, None, 1, exact=True)["pending_id"])        # v2
+    level["s"] = 2.0
+    SC.execute_pending(rid, SC.propose_criterion(rid, "Support", "10 only if 24x7 with a named engineer", 20, None, None, 3, exact=True)["pending_id"])  # v3
+    assert SC.current_version(rid) == 3
+
+    def support_scores(version):
+        tables, _ = C.compute(rid, "R-001", C.DEFAULTS, scorecard_version=version)
+        t = tables["scorecard"]
+        return set(t[t["Criterion Id"] == "support"]["Score"])
+    assert support_scores(2) == {9.0} and support_scores(3) == {2.0}                        # the old rubric keeps its old scores
+    SC.restore(rid, 2)
+    assert SC.current_version(rid) == 4 and SC.load_version(rid)["note"] == "Restored version 2"
+    assert {c["id"]: c["rubric"] for c in SC.load_version(rid)["criteria"]}["support"] == "10 if 24x7"
+    with pytest.raises(ValueError):
+        SC.restore(rid, 4)                                                                    # already current
+    with pytest.raises(ValueError):
+        SC.restore(rid, 99)
