@@ -104,3 +104,8 @@ def test_failed_attempts_are_logged_without_the_password(client, state_dir):
 
 def test_the_old_basic_prompt_is_gone(client):
     assert "www-authenticate" not in {k.lower() for k in client.get("/api/live/current").headers}
+
+
+def test_the_sessions_file_is_private(client, state_dir):
+    sign_in(client)
+    assert oct((state_dir / "sessions.json").stat().st_mode & 0o777) == "0o600"

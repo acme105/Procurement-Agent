@@ -59,6 +59,7 @@ def _save(data: dict) -> None:
     config.STATE_DIR.mkdir(parents=True, exist_ok=True)
     tmp = _file().with_suffix(".tmp")
     tmp.write_text(json.dumps(data))
+    tmp.chmod(0o600)                                  # hashes only, but no reason for other users to read them
     tmp.replace(_file())
 
 
