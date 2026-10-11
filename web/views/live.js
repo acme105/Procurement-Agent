@@ -21,7 +21,7 @@ export async function render(root) {
   function bubble(m) {
     return m.role === 'user'
       ? h('div', { class: 'bubble-q', style: { alignSelf: 'flex-end', maxWidth: '88%' } }, m.text)
-      : h('div', { class: 'card tight', style: { maxWidth: '92%', ...(m.error ? { background: 'var(--err-bg)' } : {}) } }, m.text);
+      : h('div', { class: 'card tight chat-msg', style: { maxWidth: '100%', ...(m.error ? { background: 'var(--err-bg)' } : {}) } }, m.text);
   }
   function drawChat() {
     const welcome = v.chat.length ? [] : [h('div', { class: 'card tight' }, 'Hey there! I’m Pro. Tell me what you need to buy and I’ll build the RFQ as we talk.')];

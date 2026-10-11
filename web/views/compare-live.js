@@ -288,7 +288,7 @@ export async function render(root) {
       ready ? h('div', { class: 'row' }, ...SUGGEST.map(s => h('button', { class: 'chip', onclick: () => { input.value = s; ask(); } }, s))) : null];
     chatLog.replaceChildren(...intro.filter(Boolean), ...chat.map(m => m.role === 'user'
       ? h('div', { class: 'bubble-q', style: { alignSelf: 'flex-end', maxWidth: '88%' } }, m.text)
-      : h('div', { class: 'card tight chat-md', style: { maxWidth: '96%', overflowX: 'auto', ...(m.error ? { background: 'var(--err-bg)' } : {}) }, html: md(m.text) })));
+      : h('div', { class: 'card tight chat-md chat-msg', style: { maxWidth: '100%', ...(m.error ? { background: 'var(--err-bg)' } : {}) }, html: md(m.text) })));
     chatLog.scrollTop = chatLog.scrollHeight;
     input.disabled = sendBtn.disabled = !ready || busy;
   }
