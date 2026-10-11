@@ -160,7 +160,8 @@ details.query summary { cursor: pointer; color: var(--primary); font-weight: 600
 .cmp-table table.grid th.fz { z-index: 5; }
 .cmp-table .fz-last { box-shadow: 1px 0 0 var(--border-strong); }
 .cmp-table table.grid th { white-space: nowrap; }
-.cmp-table table.grid td { font-size: 13px; }
+.cmp-table table.grid td { font-size: 11.5px; line-height: 1.35; padding: 7px 10px; }
+.cmp-table table.grid th { font-size: 11px; line-height: 14px; padding: 8px 10px; }
 .cmp-table td.best { background: var(--ok-bg); color: var(--ok-fg); font-weight: 600; }
 .cmp-table td.wrap { min-width: 220px; max-width: 360px; white-space: normal; }
 .chat-md table { border-collapse: collapse; font-size: 12px; margin: 6px 0; }
@@ -178,5 +179,5 @@ details.query summary { cursor: pointer; color: var(--primary); font-weight: 600
 .cmp-chat .bubble-q, #view .bubble-q { font: 400 13px/1.45 var(--font-ui); padding: 9px 13px; }
 
 /* Long text in table cells is shown in full, wrapped */
-.cmp-table td.wrap { min-width: 220px; max-width: 360px; white-space: normal; overflow-wrap: anywhere; line-height: 1.45; }
-.cmp-table td.wrap.long { min-width: 360px; max-width: 560px; }
+.cmp-table td.wrap { min-width: 200px; max-width: 340px; white-space: normal; overflow-wrap: anywhere; line-height: 1.35; }
+.cmp-table td.wrap.long { min-width: 420px; max-width: 760px; font-size: 11px; }
