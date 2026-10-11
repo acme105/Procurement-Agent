@@ -71,7 +71,7 @@ The product has one login (the buyer) and one open page (the vendor upload page)
 - **Weighted scorecard:** vendors are ranked by a score out of 100 over criteria: price, lead time, each RFQ question, and custom ones. The model proposes the starting weights from the RFQ. In chat the buyer can restate weights or relations ("price 50, delivery twice the laptop warranty"), set a minimum score that fails a vendor, and add or change a criterion with a rubric ("10 only if it names the dispatch origin and a date per site"). Weight and minimum changes recompute instantly; a new or changed rubric re-reads the vendors' documents and asks the buyer first (Proceed or Cancel, or a typed yes). Each change saves a new scorecard version; a Scorecard tab shows every criterion, weight, score and the reason, with a version picker (an earlier version is shown read-only with its own scores, and **Make current** restores it as a new version); Summary can rank by score or by cost.
 
 ### 4.4 Platform
-- HTTPS, buyer login (HTTP Basic, one shared credential), vendor links protected by random 128-bit tokens.
+- HTTPS; a **sign-in page** (one shared password, no username) with clear errors, a session that stays signed in until the buyer presses **Sign out**, and a return to the page the buyer was on; vendor links protected by random 128-bit tokens. The health check is open but reveals only `ok`; configuration details are behind sign-in.
 
 ## 5. Primary flow
 
@@ -134,6 +134,11 @@ Buyer chats with Ana  ->  Finalise (PDF printed, RFQ locked)  ->  Send by email 
 | A vendor does not state a lead time or skips a question | Scores 0 on that criterion and is flagged "not stated" |
 | A rubric depends on detail the extraction summarised away | Rubric criteria re-read the vendor's original document, not the summary |
 | Buyer wants an earlier scorecard back | Version picker: view it read-only with its own scores, or make it current (saved as a new version) |
+| Empty or wrong password at sign-in | "Enter your password." or "That password isn't right." under the field; the box is kept for another try |
+| Server unreachable or slow while signing in | "Can't reach the server…" or "The server took too long…"; nothing is lost |
+| Session ended (sign-out elsewhere, or the password was changed) while working | The page goes to sign-in with "Your session ended", returns to the same page afterwards, and an unsent chat message is put back in the box |
+| Someone opens a link to a page while signed out | Sign-in first, then straight to that page |
+| A link that tries to send the buyer to another website after sign-in | Ignored; goes to the app's home page |
 | Analyst asked something the tables do not hold | Ana says so and offers to read it from the proposals as a new parameter |
 | Server restarts mid-run | Known issue: the interrupted run stays marked "running" and the app refuses to start another run until the operator marks it failed (see 10) |
 
@@ -165,7 +170,7 @@ The product does not have an analytics dashboard. This table separates what the 
 
 Not built, not deployed, and not implied by the product:
 
-- **Users and security:** accounts, roles, per-user permissions, single sign-on, password reset, audit trail of who did what, rate limiting, malware scanning of uploads.
+- **Users and security:** named accounts, roles, per-user permissions, single sign-on, password reset, audit trail of who did what, lockout or rate limiting after failed sign-ins, malware scanning of uploads.
 - **Sourcing process:** vendor master and eligibility checks, automatic vendor shortlisting and invitations, deadlines and reminders, a response tracker, clarification requests to vendors, reading vendor replies from an inbox, other channels (WhatsApp, SMS) beyond a shareable link.
 - **After the comparison:** award decisions and scenarios beyond the two shown, approvals, purchase orders, contracts, exports of an award pack, charts and dashboards.
 - **Data:** live exchange rates, tax (GST) normalisation, landed cost with freight, price history, item-master administration (the catalog is a static file), multi-category catalogs.
@@ -181,7 +186,7 @@ Not built, not deployed, and not implied by the product:
 | The starting weights are the model's judgement of the RFQ | A buyer may disagree with the standard | The buyer's own weights and relations override it, and each change is a saved version |
 | Custom-criterion scores come from the model reading the document | The same document can score differently between fresh readings; re-reading scans and photos is slow (minutes) and can time out | Scores are cached per rubric and file; each score shows its reason and a quote; a timed-out vendor is flagged and retried, not failed; the buyer is told the time estimate first |
 | Substitutions inside a matched line are not detected | A vendor offering a close but different spec could pass | Specs are visible in the document and can be asked of Ana |
-| One shared login | No individual accountability | Behind HTTPS; the credential is held only by the operator and buyer |
+| One shared password and no lockout | No individual accountability; repeated guessing is not slowed | Over HTTPS only; failed attempts are logged; changing the password signs everyone out |
 | No rate limit | Anyone with a vendor link can upload many files | Links are random and per recipient; one active file per organisation |
 | Single process and local files | A restart during a run leaves it marked "running", which blocks new runs until cleared by the operator; no failover | The fix is small (mark stale runs failed on start-up) and not yet made; re-running is cheap because extraction is cached |
 | Shared server with other products | Disk (88% used) and memory are shared | Memory-capped service; disk monitored by the operator |

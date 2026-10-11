@@ -21,14 +21,15 @@ A single-process Python web app (FastAPI) with a no-build JavaScript front end. 
 
 ```
 Browser (buyer)                                   Browser (vendor)
-   |  HTTPS, Basic auth                              |  HTTPS, no login (token in URL)
+   |  HTTPS, sign-in cookie                          |  HTTPS, no login (token in URL)
    v                                                 v
  nginx container (existing, shared; TLS, host routing, 25 MB body limit, no SSE buffering)
    |  proxy_pass to the VM's Docker bridge address, port 8085 (not reachable from the internet)
    v
  uvicorn (1 worker)  <-- systemd service "aerchain", user aerchain, MemoryMax 1.2 GB
    |
-   +-- app/main.py         buyer login middleware, routers, static files
+   +-- app/auth.py         sign-in page, session cookie, sign-out, the guard that protects buyer routes
+   +-- app/main.py         routers, static files, health
    +-- app/live_rfx.py     RFQ state, co-pilot chat (SSE), finalise, PDF, send, vendor page and upload
    +-- app/live_compare.py proposals, extraction runs, math engine, tables, viewer pages, RFQ viewer
    +-- app/live_analyst.py analyst chat (SSE) and its tools
@@ -52,7 +53,8 @@ The app is stateless apart from the state directory; all long work (extraction, 
 | `live_analyst.py` | System prompt with the run's context and scorecard; thirteen tools; SSE stream; saved chat. |
 | `llm.py` | `call()`: structured output through the Responses API, cached by input hash; appends a record per call to the run log. `client()` for the chat agents. |
 | `printing.py` | Writes HTML to a temp file, runs Chrome, waits for a stable PDF, kills a lingering process. |
-| `main.py` | Buyer login middleware (exempts `/q/` and `/api/q/`), router registration, health, redirect to the app. |
+| `auth.py` | Password check, sessions, the guard middleware (open: sign-in routes, `/web/`, vendor routes, `/api/health`), sign-in page and endpoints, the cross-site request check. |
+| `main.py` | Router registration, health, redirect to the app. |
 
 ## 4. Data model
 
@@ -61,6 +63,8 @@ Everything lives under `STATE_DIR` (default `./state`, on the server `/opt/aerch
 ```
 state/
   runs.jsonl                         one JSON line per model call made through llm.call
+  sessions.json                      hashed sign-in tokens
+  auth.log                           sign-in successes, failures and sign-outs (time, event, address)
   cache/<job>/<input_hash>.json      cached structured model results
   live/
     current.txt                      id of the RFQ the buyer last opened
@@ -94,11 +98,14 @@ state/
 
 ## 5. API
 
-All paths are under one origin. "Buyer" means the Basic-auth login is required whenever `AERCHAIN_BUYER_PASSWORD` is set.
+All paths are under one origin. "Buyer" means a valid session cookie is required whenever `AERCHAIN_BUYER_PASSWORD` is set (otherwise the app is open, for local use).
 
 | Method and path | Auth | Purpose |
 | --- | --- | --- |
-| `GET /api/health` | Buyer | Model, whether email, catalog and key are configured |
+| `GET /login` | Open | The sign-in page |
+| `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` | Open, open, Buyer | Sign in (sets the session cookie), sign out (ends the session), whether a login is required (the page's start-up check) |
+| `GET /api/health` | Open | `{"ok": true}` only, for uptime checks |
+| `GET /api/health/details` | Buyer | Model, whether email, catalog and key are configured |
 | `GET /api/live/current`, `GET/POST /api/live/rfqs`, `GET /api/live/rfqs/{id}`, `POST …/open` | Buyer | Current RFQ, history, create, read, switch |
 | `POST /api/live/rfqs/{id}/messages` | Buyer | Co-pilot turn; response is SSE (`rfx`, `tool`, `done`) |
 | `POST …/finalise`, `GET …/pdf` | Buyer | Lock and print; download the PDF |
@@ -116,7 +123,7 @@ All paths are under one origin. "Buyer" means the Basic-auth login is required w
 | `POST …/analyst/pending/{pid}/approve`, `…/cancel` | Buyer | Approve (streams progress as proposals are re-read) or cancel a pending rubric change |
 | `GET …/{id}/analyst`, `POST …/analyst/messages`, `POST …/analyst/reset` | Buyer | Analyst chat; the message response is SSE (`chat`, `tool`, `tables`, `open`, `done`) |
 
-The static front end (`/web/…`) is also behind the buyer login. The vendor page is self-contained HTML, so it needs no static assets.
+The static front end (`/web/…`) is open: it holds no data (the code is public) and serving it lets the page read the full URL, including the `#/…` part, before it asks `/api/auth/me` whether a session exists. Every other API route answers `401` JSON (`reason`: `missing` or `expired`) without a session; the page then goes to `/login?next=…`. The vendor page is self-contained HTML.
 
 ## 6. Model usage
 
@@ -162,7 +169,7 @@ A run executes in a background thread. Only one run may be in progress per RFQ.
 
 | Area | Control | Gap |
 | --- | --- | --- |
-| Buyer access | HTTP Basic login (constant-time compare) on everything except `/q/` and `/api/q/`; enforced only when `AERCHAIN_BUYER_PASSWORD` is set | One shared credential; no lockout or rate limit; the login is off by default on a developer machine |
+| Buyer access | One shared password (`AERCHAIN_BUYER_PASSWORD`, constant-time compare). A random 256-bit token in an `HttpOnly`, `SameSite=Lax`, `Secure` cookie; only its hash is stored (`state/sessions.json`), so sessions survive restarts and a copied file can't be replayed. No idle timeout: signed in until sign-out; a changed password ends every session. Non-GET requests with a foreign `Origin` are refused. Sign-in results are logged without the password (`state/auth.log`) | One credential for everyone; no lockout or rate limit; login is off by default on a developer machine |
 | Vendor access | 128-bit random per-recipient token and one shareable token per RFQ | No expiry or revoke; anyone holding a link can upload |
 | Transport | TLS terminated at nginx (Let's Encrypt, auto-renewed, nginx reloaded by a renewal hook); HTTP redirects to HTTPS | None known |
 | Network | The app listens only on the VM's Docker bridge address, so it is reachable from containers and the host, not the internet | Any container on that host can reach the port |
@@ -221,6 +228,7 @@ A run executes in a background thread. Only one run may be in progress per RFQ.
 | 10 | Model cache and run log grow without bound | Disk is shared and at 88% | Retention policy and cache pruning |
 | 11 | Re-reading scans and photos for a new rubric is slow and can time out | A vendor is scored 0 and flagged until retried; the time estimate can be off | Estimates are by file type; failed vendors are retried on the next run or an approved retry; a faster document path for scans would help |
 | 12 | Custom-criterion scores are a model judgement; an older version shows scores only if that rubric was scored | Not reproducible across fresh readings | Reason and quote shown; an evaluation set is out of scope |
+| 13 | No lockout after repeated wrong passwords, and one shared credential | Guessing is not slowed; no per-person accountability | Failed attempts are in the auth log; a lockout and named accounts are the next steps |
 
 ## 13. Out of scope (technical)
 
@@ -229,5 +237,5 @@ Not built and not deployed: a database, a job queue, multiple workers or servers
 ## 14. Verification
 
 - **Code:** `pytest -q` (22 tests, no network).
-- **Deployed release:** `git log -1` in `/opt/aerchain` and `systemctl is-active aerchain`; `GET /api/health` (behind the login) returns the model and whether email, the catalog and the model key are configured.
+- **Deployed release:** `git log -1` in `/opt/aerchain` and `systemctl is-active aerchain`; `GET /api/health` returns `ok`; `GET /api/health/details` (signed in) returns the model and whether email, the catalog and the model key are configured.
 - **End to end:** `python -m scripts.seed_demo` loads the demo RFQ and proposals; Run comparison on that RFQ should produce 5 of 8 vendors compliant, with headline figures within the model's run-to-run variation, and a starting scorecard (version 1) announced in the analyst chat. `GET …/scorecard` returns it; the Scorecard tab and the Score/Cost toggle on Summary should agree with the saved tables.

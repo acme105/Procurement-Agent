@@ -17,12 +17,31 @@ export function h(tag, attrs = {}, ...children) {
   return el;
 }
 
+// Session ended or not signed in: go to the sign-in page and come back to this exact page afterwards.
+// An unsent chat message is kept in this tab and put back in the box on return.
+export function signInAgain(reason = 'expired', draft = '') {
+  try { if (draft) sessionStorage.setItem('procurement.draft', JSON.stringify({ route: location.hash.split('?')[0], text: draft })); } catch { /* storage blocked */ }
+  location.replace(`/login?reason=${reason}&next=${encodeURIComponent(location.pathname + location.search + location.hash)}`);
+  return new Promise(() => {});                       // the page is leaving: never resolve
+}
+export function takeDraft() {
+  try {
+    const d = JSON.parse(sessionStorage.getItem('procurement.draft') || 'null');
+    if (d && d.route === location.hash.split('?')[0]) { sessionStorage.removeItem('procurement.draft'); return d.text; }
+  } catch { /* none */ }
+  return '';
+}
+
 export async function api(path, { method = 'GET', body, form, raw = false } = {}) {
   const headers = {};
   let payload;
   if (form) payload = form;
   else if (body !== undefined) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
   const res = await fetch(path, { method, headers, body: payload });
+  if (res.status === 401 && !path.startsWith('/api/auth/')) {
+    let reason = 'missing'; try { reason = (await res.clone().json()).reason === 'expired' ? 'expired' : 'missing'; } catch { /* keep */ }
+    return signInAgain(reason);                       // 'expired' shows a banner on the sign-in page; 'missing' (never signed in) does not
+  }
   if (raw) return res;
   const text = await res.text();
   let data; try { data = text ? JSON.parse(text) : null; } catch { data = text; }

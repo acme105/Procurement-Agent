@@ -1,6 +1,6 @@
 // Live RFQ (C10): chat with Ana on the right, the RFQ redrawing in the centre as the agent calls its tools.
 // Finalise locks the RFQ and prints the PDF; only then can it be emailed to typed addresses or downloaded.
-import { h, api, toast, modal, download, istDateTime } from '../components.js';
+import { h, api, toast, modal, download, istDateTime, signInAgain, takeDraft } from '../components.js';
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 let busy = false;
@@ -11,6 +11,7 @@ export async function render(root) {
   const centre = h('div', { class: 'stack', style: { minWidth: 0 } });
   const chatLog = h('div', { class: 'stack', style: { flex: 1, overflow: 'auto', gap: '10px', paddingRight: '4px' } });
   const input = h('input', { class: 'full', placeholder: 'Describe what you need to buy…', style: { flex: 1 } });
+  input.value = takeDraft();                        // a message typed before the session ended
   const sendBtn = h('button', { class: 'btn primary' }, 'Send');
   const typing = h('div', { class: 'small muted', style: { visibility: 'hidden' } }, 'Ana is working…');
   const chat = h('div', { class: 'card', style: { display: 'flex', flexDirection: 'column', gap: '12px', height: 'calc(100vh - 120px)', position: 'sticky', top: 0 } },
@@ -175,6 +176,7 @@ export async function render(root) {
     v.chat = [...v.chat, { role: 'user', text }]; draw();
     try {
       const res = await fetch(`/api/live/rfqs/${v.id}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
+      if (res.status === 401) return signInAgain('expired', text);
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || res.statusText);
       const reader = res.body.getReader(), dec = new TextDecoder();
       let buf = '';

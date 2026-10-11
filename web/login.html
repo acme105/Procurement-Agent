@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign in · Procurement</title>
+  <link rel="icon" type="image/svg+xml" href="/web/logo.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/web/tokens.css">
+  <style>
+    body { display: grid; place-items: center; min-height: 100vh; padding: 16px; }
+    .login { width: 100%; max-width: 380px; }
+    .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+    .brand img { width: 40px; height: 40px; }
+    .brand b { font: 700 20px/1.2 var(--font-ui); color: var(--dark-blue); }
+    .pw { position: relative; }
+    .pw input { width: 100%; padding-right: 64px; }
+    .pw button { position: absolute; right: 6px; top: 6px; height: 28px; border: 0; background: none; color: var(--primary); font: 500 12px var(--font-ui); cursor: pointer; padding: 0 8px; }
+    .note { padding: 10px 12px; border-radius: 10px; font-size: 13px; line-height: 18px; }
+    .note.info { background: var(--ind-bg); color: var(--ind-fg); }
+    .note.error { background: var(--err-bg); color: var(--err-fg); }
+    .hint { font-size: 12px; color: var(--warn-fg); }
+    .btn.primary { width: 100%; justify-content: center; }
+  </style>
+</head>
+<body>
+  <main class="card login" aria-labelledby="t">
+    <div class="brand"><img src="/web/logo.svg" alt=""><b>Procurement</b></div>
+    <h1 id="t" class="h5" style="margin-bottom:12px">Sign in</h1>
+    <div id="reason" class="note info" hidden style="margin-bottom:12px"></div>
+    <form id="f" class="stack" novalidate style="gap:14px">
+      <div class="field">
+        <label for="pw">Password</label>
+        <div class="pw">
+          <input id="pw" name="password" type="password" autocomplete="current-password" autofocus aria-describedby="err caps">
+          <button type="button" id="show" aria-pressed="false">Show</button>
+        </div>
+        <div id="caps" class="hint" hidden>Caps Lock is on</div>
+      </div>
+      <div id="err" class="note error" role="alert" aria-live="polite" hidden></div>
+      <button id="go" class="btn primary" type="submit">Sign in</button>
+    </form>
+  </main>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const params = new URLSearchParams(location.search);
+    const REASONS = { expired: 'Your session ended. Sign in again to continue where you left off.', signedout: 'You have signed out.' };
+    if (REASONS[params.get('reason')]) { $('reason').textContent = REASONS[params.get('reason')]; $('reason').hidden = false; }
+
+    // only a path on this site; anything else goes home (the server checks again)
+    function safeNext(n) { return n && n.startsWith('/') && !n.startsWith('//') && !n.includes('://') && !n.includes('\\') ? n : '/web/#/live'; }
+
+    function showError(msg) { $('err').textContent = msg; $('err').hidden = false; $('pw').setAttribute('aria-invalid', 'true'); }
+    function clearError() { $('err').hidden = true; $('pw').removeAttribute('aria-invalid'); }
+
+    $('show').addEventListener('click', () => {
+      const on = $('pw').type === 'password';
+      $('pw').type = on ? 'text' : 'password'; $('show').textContent = on ? 'Hide' : 'Show'; $('show').setAttribute('aria-pressed', String(on));
+      $('pw').focus();
+    });
+    $('pw').addEventListener('input', clearError);
+    $('pw').addEventListener('keyup', (e) => { $('caps').hidden = !(e.getModifierState && e.getModifierState('CapsLock')); });
+
+    $('f').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearError();
+      const password = $('pw').value;
+      if (!password) { showError('Enter your password.'); $('pw').focus(); return; }
+      $('go').disabled = true; $('go').textContent = 'Signing in…';
+      const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 15000);
+      try {
+        const res = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctl.signal,
+          body: JSON.stringify({ password, next: params.get('next') }) });
+        let data = {}; try { data = await res.json(); } catch { /* not JSON */ }
+        if (res.ok) { location.replace(safeNext(data.next)); return; }
+        if (res.status === 400 || res.status === 401) showError(data.detail || 'That password isn’t right.');
+        else if (res.status === 403) showError('This request was refused. Reload the page and try again.');
+        else showError('Something went wrong on our side. Try again in a moment.');
+        $('pw').select();
+      } catch (err) {
+        showError(err.name === 'AbortError' ? 'The server took too long to answer. Try again.' : 'Can’t reach the server. Check your connection and try again.');
+      } finally {
+        clearTimeout(timer); $('go').disabled = false; $('go').textContent = 'Sign in';
+      }
+    });
+  </script>
+</body>
+</html>

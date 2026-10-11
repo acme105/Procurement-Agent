@@ -1,7 +1,7 @@
 // Compare quotes (Live RFQ): the comparison for one finalised RFQ on the left, the analyst chat on the right.
 // Proposals are the RFQ's uploads (one file per organisation). A run extracts them and saves the tables
 // (app/live_compare.py); the analyst answers from those tables (app/live_analyst.py) and can add parameters.
-import { h, api, toast, modal, tabs, inr, istDateTime, qs, setQs, download } from '../components.js';
+import { h, api, toast, modal, tabs, inr, istDateTime, qs, setQs, download, signInAgain, takeDraft } from '../components.js';
 import { openViewer } from '../viewer.js';
 
 const TABS = [['vendor_summary', 'Summary'], ['scorecard', 'Scorecard'], ['line_matrix', 'Lines'], ['cherry_pick', 'Cherry-pick'], ['questionnaire', 'Q&A'],
@@ -54,6 +54,7 @@ export async function render(root) {
   const left = h('div', { class: 'cmp-left' });
   const chatLog = h('div', { class: 'stack', style: { flex: 1, overflow: 'auto', gap: '10px', paddingRight: '4px' } });
   const input = h('input', { placeholder: 'Ask about the quotes…', style: { flex: 1, minWidth: 0 } });
+  input.value = takeDraft();                        // a message typed before the session ended
   const sendBtn = h('button', { class: 'btn primary' }, 'Ask');
   const typing = h('div', { class: 'small muted', style: { visibility: 'hidden' } }, 'Ana is working…');
   const chatCard = h('div', { class: 'card cmp-chat', style: { display: 'flex', flexDirection: 'column', gap: '12px', padding: '16px' } },
@@ -354,6 +355,7 @@ export async function render(root) {
     go.disabled = no.disabled = true; approving = p.id;
     try {
       const res = await fetch(`/api/live/rfqs/${rid}/analyst/pending/${p.id}/approve`, { method: 'POST' });
+      if (res.status === 401) return signInAgain('expired');
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || res.statusText);
       const reader = res.body.getReader(), dec = new TextDecoder();
       let buf = '', failed = null;
@@ -396,6 +398,7 @@ export async function render(root) {
     chat = [...chat, { role: 'user', text }]; drawChat();
     try {
       const res = await fetch(`/api/live/rfqs/${rid}/analyst/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, run_id: runId }) });
+      if (res.status === 401) return signInAgain('expired', text);
       if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || res.statusText);
       const reader = res.body.getReader(), dec = new TextDecoder();
       let buf = '';

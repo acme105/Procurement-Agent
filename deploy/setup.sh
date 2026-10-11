@@ -39,4 +39,4 @@ sed -e "s#__APP_DIR__#$APP_DIR#g" -e "s#__HOST__#$HOST#g" -e "s#__PORT__#$PORT#g
 systemctl daemon-reload
 systemctl enable aerchain >/dev/null
 systemctl restart aerchain
-echo "Installed. Check: curl -s http://$HOST:$PORT/api/health   (needs the buyer login once AERCHAIN_BUYER_PASSWORD is set)"
+echo "Installed. Check: curl -s http://$HOST:$PORT/api/health   (open; details are at /api/health/details after signing in)"

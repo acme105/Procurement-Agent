@@ -44,9 +44,12 @@ git-ignored.
 
 ## Security notes
 
-- There is **no login**. Run it locally. Do not expose it to the internet as is: anyone who can reach it could send
-  email from your SMTP account and spend your model credit. Put it behind a password before sharing a public address;
-  vendors only need `/q/<token>`.
+- **Sign-in:** set `AERCHAIN_BUYER_PASSWORD` and every buyer page asks for that one shared password on a sign-in page,
+  then keeps you signed in until you press **Sign out**. Changing the password signs everyone out. With no password set
+  the app is open: fine on your own machine, but **always set one before exposing it to the internet**, or anyone who
+  can reach it could send email from your SMTP account and spend your model credit. Serve it over HTTPS (the session
+  cookie is marked `Secure` behind HTTPS). There is no lockout after wrong passwords; failed attempts are written to
+  `state/auth.log`. Vendors only need `/q/<token>` and never sign in.
 - Vendor links are random tokens; anyone holding one can upload a file to that RFQ.
 
 ## Layout
