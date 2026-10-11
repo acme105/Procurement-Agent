@@ -134,7 +134,7 @@ tools = [
         "type": "function",
         "function": {
             "name": "add_to_rfx",
-            "description": "Add specific item codes OR a generic requirement to the RFx draft, including site quantities.",
+            "description": "Add specific item codes OR a generic requirement to the RFx draft, including site quantities. Every item code becomes its own line item (you may pass several codes in one call). An item with no catalog code is added as generic_requirements, one line per call.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -314,12 +314,16 @@ def apply_tool(st: dict, name: str, args: dict) -> str:
     if name == "add_to_rfx":
         start = len(r["items"])
         sq = args.get("site_quantities") or {}
-        base = {"item_codes": args.get("item_codes", []), "generic_requirements": args.get("generic_requirements", "")}
-        if not sq:
-            r["items"].append({**base, "location": "N/A", "quantity": "N/A"})
-        else:
-            for site, q in sq.items():
-                r["items"].append({**base, "location": site, "quantity": q})
+        codes, generic = args.get("item_codes") or [], args.get("generic_requirements", "")
+        # several catalog codes are several items: each gets its own line (a line holds many codes only alongside a requirement text)
+        groups = [[code] for code in codes] if len(codes) > 1 and not generic else [codes]
+        for group in groups:
+            base = {"item_codes": group, "generic_requirements": generic}
+            if not sq:
+                r["items"].append({**base, "location": "N/A", "quantity": "N/A"})
+            else:
+                for site, q in sq.items():
+                    r["items"].append({**base, "location": site, "quantity": q})
         return f"Items added successfully at Line Numbers: {list(range(start + 1, len(r['items']) + 1))}"
     if name == "remove_from_rfx":
         nums = args.get("line_numbers", [])

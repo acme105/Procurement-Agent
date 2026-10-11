@@ -121,3 +121,15 @@ def test_failure_names_missing_and_unrequested_items(state_dir):
     assert "Quoted items not in the RFQ: Laptop backpack (1 rows); Laptop 15-inch (1 rows)" in v["Fail Reasons"]
     assert v["Missing Items"] == "USB-C docking station (lines 2–3)"
     assert "Kolkata" in v["Flags"] and "Kolkata" not in v["Fail Reasons"]
+
+
+def test_several_catalog_codes_become_separate_lines(state_dir):
+    st = L.create_rfq()
+    out = L.apply_tool(st, "add_to_rfx", {"item_codes": ["IT-LAP-0001", "IT-LAP-0002", "IT-LAP-0003"], "site_quantities": {"Manyata": 5}})
+    assert len(st["rfx"]["items"]) == 3 and out.endswith("[1, 2, 3]")
+    assert [i["item_codes"] for i in st["rfx"]["items"]] == [["IT-LAP-0001"], ["IT-LAP-0002"], ["IT-LAP-0003"]]
+    assert all(i["location"] == "Manyata" and i["quantity"] == 5 for i in st["rfx"]["items"])
+    # codes together with a requirement text stay one line; a free-text item is one line
+    L.apply_tool(st, "add_to_rfx", {"item_codes": ["A", "B"], "generic_requirements": "either is fine", "site_quantities": {"Manyata": 1}})
+    L.apply_tool(st, "add_to_rfx", {"generic_requirements": "USB 3.0 pen drive 8 GB", "site_quantities": {"Manyata": 20, "Annexe": 10}})
+    assert len(st["rfx"]["items"]) == 3 + 1 + 2
