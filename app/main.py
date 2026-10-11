@@ -18,7 +18,7 @@ from .live_rfx import smtp_settings
 
 ROUTER_MODULES = ["live_rfx", "live_compare", "live_analyst"]
 
-app = FastAPI(title="AerChain Sourcing")
+app = FastAPI(title="Role Discovery Sourcing")
 
 # Buyer login. Off unless AERCHAIN_BUYER_PASSWORD is set (fine on your own machine). Vendors never log in: the upload
 # page and its endpoint are open, protected only by the random link token.
@@ -37,7 +37,7 @@ async def buyer_login(request: Request, call_next):
             except Exception:
                 sent = ""
         if not secrets.compare_digest(sent.encode(), password.encode()):
-            return Response("Login required", status_code=401, headers={"WWW-Authenticate": 'Basic realm="AerChain Sourcing", charset="UTF-8"'})
+            return Response("Login required", status_code=401, headers={"WWW-Authenticate": 'Basic realm="Role Discovery Sourcing", charset="UTF-8"'})
     return await call_next(request)
 
 for _name in ROUTER_MODULES:

@@ -9,8 +9,8 @@ const DEFAULT = 'live';
 
 function renderTop() {
   document.getElementById('topbar').replaceChildren(
-    h('div', { class: 'logo' }, 'LOGO'),
-    h('strong', {}, 'AerChain'),
+    h('img', { class: 'brand-logo', src: '/web/logo.svg', alt: 'Role Discovery' }),
+    h('strong', {}, 'Role Discovery'),
     h('div', { class: 'event' }, h('span', { class: 'meta' }, 'Sourcing · RFQ co-pilot and quote comparison')));
 }
 

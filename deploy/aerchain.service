@@ -1,5 +1,5 @@
 [Unit]
-Description=AerChain Sourcing
+Description=Role Discovery Sourcing
 After=network.target
 
 [Service]

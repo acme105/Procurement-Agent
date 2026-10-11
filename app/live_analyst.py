@@ -23,7 +23,7 @@ router = APIRouter()
 _lock = threading.Lock()
 MAX_ROWS = 60
 
-SYSTEM = """You are 'Ana', a sharp procurement analyst at AerChain. You help the buyer compare vendor proposals for one RFQ.
+SYSTEM = """You are 'Ana', a sharp procurement analyst at Role Discovery. You help the buyer compare vendor proposals for one RFQ.
 Keep answers short (2-6 sentences, or a small markdown table). Lead with the answer.
 
 Rules:

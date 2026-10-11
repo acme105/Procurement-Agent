@@ -93,7 +93,7 @@ export async function render(root) {
   const send = { emails: [], subject: null, message: null };
   function sendPanel() {
     send.subject ??= `Request for quotation: ${v.scope}`;
-    send.message ??= `Hello,\n\nPlease find attached our request for quotation: ${v.scope}.\nKindly reply with your best prices, availability and answers to the supplier questions.\n\nThank you,\nAerChain Procurement`;
+    send.message ??= `Hello,\n\nPlease find attached our request for quotation: ${v.scope}.\nKindly reply with your best prices, availability and answers to the supplier questions.\n\nThank you,\nRole Discovery`;
     const chips = h('div', { class: 'row' });
     const field = h('input', { placeholder: 'name@vendor.com, another@vendor.com', style: { flex: 1, minWidth: '240px' } });
     const err = h('div', { class: 'err small' });

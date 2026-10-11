@@ -28,6 +28,8 @@ from . import config, llm, printing
 from .util import iso
 
 router = APIRouter()
+BRAND = "Role Discovery"
+LOGO_SVG = "<svg viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'><rect width='40' height='40' rx='9' fill='#4F46E5'/><text x='7' y='28' font-family='system-ui, -apple-system, Helvetica, Arial, sans-serif' font-size='24' font-weight='900' fill='white'>R</text><circle cx='27' cy='24' r='6' fill='none' stroke='#F59E0B' stroke-width='2.5'/><line x1='31.5' y1='28.5' x2='35' y2='32' stroke='#F59E0B' stroke-width='2.5' stroke-linecap='round'/></svg>"
 LIVE_DIR = config.STATE_DIR / "live"
 RFQ_DIR = LIVE_DIR / "rfqs"                     # one folder per RFQ: state.json, rfq.pdf, uploads/
 CURRENT_FILE = LIVE_DIR / "current.txt"
@@ -84,7 +86,7 @@ def search_internet(query):
 
 
 
-SYSTEM_PROMPT = """You are 'Pro', a helpful, efficient procurement copilot at AerChain. Your persona is sharp, friendly, and concise. You ALWAYS respond in very short messages (1-3 sentences max).
+SYSTEM_PROMPT = """You are 'Pro', a helpful, efficient procurement copilot at Role Discovery. Your persona is sharp, friendly, and concise. You ALWAYS respond in very short messages (1-3 sentences max).
 Your job is to actively guide the user to build a complete RFx step-by-step. Do not let them just search and leave. Guide them through these steps, one at a time:
 1. Scope: Ask what the overarching goal of the procurement is. Use set_rfx_scope to save it.
 2. Line Items: Help them search the catalog. Use add_to_rfx to save items.
@@ -437,7 +439,7 @@ def rfq_html(v: dict) -> str:
 h1{{font:700 19pt/1.2 Helvetica,Arial,sans-serif;color:#100E5B;margin:4pt 0 2pt}}h2{{font:700 12pt Helvetica,Arial,sans-serif;color:#373192;margin:16pt 0 6pt}}
 .m{{color:#5B6170}}table{{width:100%;border-collapse:collapse}}th{{text-align:left;background:#EEEDFB;color:#373192;font-weight:600}}
 th,td{{padding:3pt 6pt;border-bottom:1px solid #E3E6EE;vertical-align:top}}tr{{page-break-inside:avoid}}.n{{text-align:right}}</style></head><body>
-<div class="m">AerChain · Request for quotation</div><h1>{escape(v['scope'] or 'Request for quotation')}</h1>
+<div class="m" style="display:flex;align-items:center;gap:8pt"><span style="width:22pt;height:22pt;display:inline-block">{LOGO_SVG}</span><b style="color:#242526;font-size:11pt">{BRAND}</b> · Request for quotation</div><h1>{escape(v['scope'] or 'Request for quotation')}</h1>
 <div class="m">Finalised {escape(v['finalised_at'] or '')}</div>
 <h2>Line items</h2><table><thead><tr><th>#</th><th>Item</th><th>Location</th><th class="n">Qty</th></tr></thead><tbody>{rows}</tbody></table>
 <h2>Questions for suppliers</h2><ol>{qs}</ol></body></html>"""
@@ -595,7 +597,7 @@ def vendor_page(token: str):
                    f"<td class='n'>{escape(str(l['quantity']))}</td></tr>" for l in v["lines"])
     qs = "".join(f"<li>{escape(q)}</li>" for q in v["questionnaire"])
     return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{escape(st['id'])} · Submit your quotation</title>
+<title>{escape(st['id'])} · Submit your quotation · {BRAND}</title><link rel="icon" href="data:image/svg+xml,{urllib.parse.quote(LOGO_SVG)}">
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>body{{margin:0;background:#F4F7FB;color:#242526;font:500 14px/20px Geist,system-ui,sans-serif}}
 main{{max-width:760px;margin:0 auto;padding:32px 16px 64px}}.card{{background:#fff;border:1px solid #E3E6EE;border-radius:16px;padding:24px;margin-top:16px}}
@@ -605,7 +607,7 @@ td{{padding:8px;border-bottom:1px solid #E3E6EE;vertical-align:top}}.n{{text-ali
 label{{display:block;font-size:12px;margin:12px 0 6px}}input[type=text],input:not([type=file]){{width:100%;box-sizing:border-box;height:40px;border:1px solid #C9CEDA;border-radius:10px;padding:0 12px;font:500 14px Geist,system-ui,sans-serif}}
 button{{margin-top:14px;height:40px;padding:0 18px;border:0;border-radius:10px;background:linear-gradient(90deg,#3B03C5,#9B38FC);color:#fff;font:500 14px Geist,sans-serif;cursor:pointer}}
 button[disabled]{{opacity:.5}}#msg{{margin-top:10px}}.ok{{color:#114E0B}}.err{{color:#B42318}}ul{{margin:6px 0 0;padding-left:20px}}</style></head><body><main>
-<div class="m">Request for quotation · {escape(st['id'])}</div><h1>{escape(v['scope'] or '')}</h1>
+<div class="m" style="display:flex;align-items:center;gap:10px"><span style="width:28px;height:28px;display:inline-block">{LOGO_SVG}</span><b style="color:#242526;font-size:15px">{BRAND}</b></div><div class="m" style="margin-top:14px">Request for quotation · {escape(st['id'])}</div><h1>{escape(v['scope'] or '')}</h1>
 <div class="card"><h2>Submit your quotation</h2>
 <p class="m" style="margin-top:0">Upload your quote in any format: PDF, Excel, Word, CSV or a photo. One file per organisation: uploading again replaces your earlier file.</p>
 <form id="f"><label for="org">Your organisation name *</label>
