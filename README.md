@@ -1,4 +1,4 @@
-# Role Discovery Sourcing: Live RFQ and Compare quotes
+# Procurement: Live RFQ and Compare quotes
 
 Take-home prototype for "Kill the Quote Spreadsheet". Two parts of one flow:
 

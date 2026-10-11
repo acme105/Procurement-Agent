@@ -1,5 +1,5 @@
 [Unit]
-Description=Role Discovery Sourcing
+Description=Procurement
 After=network.target
 
 [Service]

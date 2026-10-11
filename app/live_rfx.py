@@ -28,8 +28,8 @@ from . import config, llm, printing
 from .util import iso
 
 router = APIRouter()
-BRAND = "Role Discovery"
-LOGO_SVG = "<svg viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'><rect width='40' height='40' rx='9' fill='#4F46E5'/><text x='7' y='28' font-family='system-ui, -apple-system, Helvetica, Arial, sans-serif' font-size='24' font-weight='900' fill='white'>R</text><circle cx='27' cy='24' r='6' fill='none' stroke='#F59E0B' stroke-width='2.5'/><line x1='31.5' y1='28.5' x2='35' y2='32' stroke='#F59E0B' stroke-width='2.5' stroke-linecap='round'/></svg>"
+BRAND = "Procurement"
+LOGO_SVG = "<svg viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'> <defs><linearGradient id='pg' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='#3B03C5'/><stop offset='1' stop-color='#9B38FC'/></linearGradient></defs> <rect width='40' height='40' rx='10' fill='url(#pg)'/> <path d='M13 25.5V9.5h8.4a5.2 5.2 0 0 1 0 10.4H13' fill='none' stroke='#fff' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'/> <path d='M20.5 29.6l3.2 3.2 6.6-7.2' fill='none' stroke='#47DEFF' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'/> </svg>"
 LIVE_DIR = config.STATE_DIR / "live"
 RFQ_DIR = LIVE_DIR / "rfqs"                     # one folder per RFQ: state.json, rfq.pdf, uploads/
 CURRENT_FILE = LIVE_DIR / "current.txt"
@@ -86,7 +86,7 @@ def search_internet(query):
 
 
 
-SYSTEM_PROMPT = """You are 'Ana', a helpful, efficient procurement copilot at Role Discovery. Your persona is sharp, friendly, and concise. You ALWAYS respond in very short messages (1-3 sentences max).
+SYSTEM_PROMPT = """You are 'Ana', a helpful, efficient procurement copilot. Your persona is sharp, friendly, and concise. You ALWAYS respond in very short messages (1-3 sentences max).
 Your job is to actively guide the user to build a complete RFx step-by-step. Do not let them just search and leave. Guide them through these steps, one at a time:
 1. Scope: Ask what the overarching goal of the procurement is. Use set_rfx_scope to save it.
 2. Line Items: Help them search the catalog. Use add_to_rfx to save items.
