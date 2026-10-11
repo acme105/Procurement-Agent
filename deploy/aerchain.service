@@ -1,0 +1,18 @@
+[Unit]
+Description=AerChain Sourcing
+After=network.target
+
+[Service]
+User=aerchain
+WorkingDirectory=__APP_DIR__
+EnvironmentFile=/etc/aerchain/aerchain.env
+# one worker only: state is local files and an in-process lock
+ExecStart=__APP_DIR__/.venv/bin/uvicorn app.main:app --host __HOST__ --port __PORT__ --workers 1
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+# keep this service from starving other things on a small server
+MemoryMax=1200M
+
+[Install]
+WantedBy=multi-user.target

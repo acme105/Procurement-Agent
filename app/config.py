@@ -28,6 +28,7 @@ LLM_RETRIES = 2
 
 # ---- Output ------------------------------------------------------------------------------
 CHROME = os.environ.get("AERCHAIN_CHROME", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
+CHROME_NO_SANDBOX = os.environ.get("AERCHAIN_CHROME_NO_SANDBOX") == "1"
 
 
 def _env_file_value(filename: str, key: str) -> str | None:

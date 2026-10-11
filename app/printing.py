@@ -26,7 +26,8 @@ def _chrome(args: list[str], html: str, out_path: Path, timeout: int = 120) -> N
     with tempfile.TemporaryDirectory(prefix="aerchain-chrome-") as tmp:
         page = Path(tmp) / "page.html"
         page.write_text(html, encoding="utf-8")
-        cmd = [config.CHROME, "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check",
+        extra = ["--no-sandbox"] if config.CHROME_NO_SANDBOX else []      # needed when Chrome runs as root or in a container
+        cmd = [config.CHROME, *extra, "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check",
                "--disable-extensions", "--hide-scrollbars", "--allow-file-access-from-files", *args, page.as_uri()]
         proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         t0, size, stable_since = time.time(), -1, None
