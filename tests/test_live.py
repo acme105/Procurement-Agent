@@ -92,3 +92,32 @@ def test_query_table_tool():
     assert out.to_dict("records") == [{"Vendor": "A", "Total": 3.0}]
     with pytest.raises(ValueError):
         A.query(df, {"columns": ["Nope"]})
+
+
+def test_failure_names_missing_and_unrequested_items(state_dir):
+    st = L.create_rfq()
+    st["rfx"] = {"scope": "Test", "questionnaire": ["Warranty?"], "items": [
+        {"item_codes": [], "generic_requirements": "Laptop 13-inch", "location": "Delhi", "quantity": 10},
+        {"item_codes": [], "generic_requirements": "USB-C docking station", "location": "Delhi", "quantity": 5},
+        {"item_codes": [], "generic_requirements": "USB-C docking station", "location": "Mumbai", "quantity": 5}]}
+    st["status"] = "FINAL"
+    L.save(st)
+    rid = st["id"]
+
+    def row(line, item, loc="Delhi", qty=10):
+        return {"rfq_line": line, "item_description": item, "location": loc, "quantity": qty, "uom": "Each",
+                "unit_price": 100.0, "currency": "INR", "extraction_confidence": "High"}
+    p = _prop("individual", [_qa(9)])
+    p["line_items"] = [row(1, "Laptop 13-inch"), row(None, "Laptop backpack"), row(None, "Laptop 15-inch", qty=10),
+                       row(None, "Laptop 13-inch", loc="Kolkata")]      # extra location of a requested item: flag, not fail
+    run = C.adir(rid) / "R-001"
+    (run / "extractions").mkdir(parents=True)
+    (run / "manifest.json").write_text(json.dumps({"run_id": "R-001", "status": "done", "proposals": []}))
+    (run / "extractions" / "P001.json").write_text(json.dumps({"pid": "P001", "org": "Apex", "filename": "f", "proposal": p}))
+    tables, _ = C.compute(rid, "R-001", C.DEFAULTS)
+    v = tables["vendor_summary"].iloc[0]
+    assert v["Compliance Status"] == "FAIL"
+    assert "no quote for USB-C docking station (lines 2–3)" in v["Fail Reasons"]
+    assert "Quoted items not in the RFQ: Laptop backpack (1 rows); Laptop 15-inch (1 rows)" in v["Fail Reasons"]
+    assert v["Missing Items"] == "USB-C docking station (lines 2–3)"
+    assert "Kolkata" in v["Flags"] and "Kolkata" not in v["Fail Reasons"]

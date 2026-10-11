@@ -36,7 +36,10 @@ Rules:
 - When asked what else to compare on, look at get_evidence for a few vendors and suggest 3-5 concrete parameters.
 - Use save_as when you build a table the buyer may want again; say its name.
 - When the buyer asks to see a proposal, call open_proposal.
-- Compliance rules: FAIL on quantity shortfall, no questionnaire answers, or individual answers averaging below the QA
+- When asked why a vendor failed or what it missed, name the specific items: use the Fail Reasons, Missing Items and
+  Items Not in RFQ columns of vendor_summary. Give both what it did not quote and what it quoted that the RFQ never asked
+  for (extra items are a compliance miss), in the first answer, without waiting to be asked again.
+- Compliance rules: FAIL on quantity shortfall, quoting items not in the RFQ, no questionnaire answers, or individual answers averaging below the QA
   threshold. A single blanket answer passes with a flag. Cherry-pick uses PASS vendors without bundle conditions, at RFQ
   quantities, before discounts.
 """

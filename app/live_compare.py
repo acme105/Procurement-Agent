@@ -280,6 +280,24 @@ def extractions(rid: str, run_id: str) -> list[dict]:
 
 # ---- math engine (Phase 6) ----------------------------------------------------------------------
 
+def _ranges(nums: list[int]) -> str:
+    """[69, 70, 71, 75] -> '69–71, 75'"""
+    out, nums = [], sorted(nums)
+    i = 0
+    while i < len(nums):
+        j = i
+        while j + 1 < len(nums) and nums[j + 1] == nums[j] + 1:
+            j += 1
+        out.append(f"{nums[i]}–{nums[j]}" if j > i else str(nums[i]))
+        i = j + 1
+    return ", ".join(out)
+
+
+def _short(text: str, n: int = 70) -> str:
+    text = " ".join(str(text).split())
+    return text if len(text) <= n else text[: n - 1] + "…"
+
+
 def _uom_multiplier(uom: str) -> float:
     m = re.search(r"box of (\d+)", (uom or "").lower())
     return float(m.group(1)) if m else 1.0
@@ -340,13 +358,31 @@ def compute(rid: str, run_id: str, settings: dict, exclude: Optional[list[str]] 
         mine = m_li[m_li["Vendor"] == s["Vendor"]]
         quoted = mine.groupby("RFQ Line")["Norm Qty (Pieces)"].sum()
         need = rfq.set_index("RFQ Line")["Qty"]
+        need_items = rfq.set_index("RFQ Line")["Item"]
         short = (need - quoted.reindex(need.index).fillna(0)).clip(lower=0)
         missing = [int(n) for n in need.index if n not in quoted.index]
         locs = {str(x).strip().lower() for x in mine["Location"]}
         ext = float(mine["Extended Cost (INR)"].sum())
         reasons, flags = [], []
+        # which RFQ items are missing or under-quoted, named (not just counted)
+        by_item: dict[str, list[int]] = {}
+        for n in missing:
+            by_item.setdefault(" ".join(str(need_items.loc[n]).split()), []).append(int(n))
+        missing_text = "; ".join(f"{_short(item, 60)} (lines {_ranges(lines_)})" for item, lines_ in by_item.items())
+        partial = [int(n) for n in short.index if short.loc[n] > 0 and n not in missing]
+        if partial:
+            missing_text += ("; " if missing_text else "") + f"quoted less than requested on lines {_ranges(partial)}"
+        # rows that match no RFQ line: items the RFQ never asked for, vs requested items at extra locations
+        all_rows = li[li["Vendor"] == s["Vendor"]]
+        known = {str(x).lower() for x in all_rows[all_rows["Matched"]]["Vendor Item"]}
+        off = all_rows[~all_rows["Matched"]]
+        unrequested = off[~off["Vendor Item"].str.lower().isin(known)]
+        extra_locs = off[off["Vendor Item"].str.lower().isin(known)]
+        unrequested_text = "; ".join(f"{_short(item)} ({len(g)} rows)" for item, g in unrequested.groupby("Vendor Item", sort=False))
         if short.sum() > 0:
-            reasons.append("Quantity shortfall")
+            reasons.append(f"Quantity shortfall: no quote for {missing_text}" if missing_text else "Quantity shortfall")
+        if unrequested_text:
+            reasons.append(f"Quoted items not in the RFQ: {unrequested_text}")
         if s["Q&A Style"] == "none":
             reasons.append("No questionnaire answers")
         elif s["Q&A Style"] == "individual" and pd.notna(s["Avg QA Confidence / 10"]) and s["Avg QA Confidence / 10"] < qa_min:
@@ -358,17 +394,18 @@ def compute(rid: str, run_id: str, settings: dict, exclude: Optional[list[str]] 
         low = int((mine["Extraction Confidence"] == "Low").sum())
         if low:
             flags.append(f"{low} low-confidence rows")
-        unmatched = int(((li["Vendor"] == s["Vendor"]) & ~li["Matched"]).sum())
-        if unmatched:
-            flags.append(f"{unmatched} rows match no RFQ line")
+        if len(extra_locs):
+            where = sorted({str(x) for x in extra_locs["Location"]})
+            flags.append(f"Quotes {len(extra_locs)} rows for locations the RFQ didn't list ({', '.join(where[:4])}{'…' if len(where) > 4 else ''})")
         out.append({**s.to_dict(), "Compliance Status": "FAIL" if reasons else "PASS", "Fail Reasons": "; ".join(reasons) or None,
                     "Flags": "; ".join(flags) or None, "Extended Cost (INR)": ext,
                     "Final Landed Cost (INR)": ext * (1 - (s["Discount %"] or 0) / 100),
                     "Lines Quoted": int(len(need) - len(missing)), "Lines in RFQ": int(len(need)),
-                    "Missing Lines": ", ".join(map(str, missing)) or None, "Quantity Shortfall": float(short.sum()),
+                    "Missing Items": missing_text or None, "Items Not in RFQ": unrequested_text or None,
+                    "Missing Lines": _ranges([int(n) for n in missing]) or None, "Quantity Shortfall": float(short.sum()),
                     "Delivers to All Locations": req_locations.issubset(locs)})
     order = ["Vendor", "Compliance Status", "Fail Reasons", "Flags", "Final Landed Cost (INR)", "Extended Cost (INR)", "Discount %",
-             "Lines Quoted", "Lines in RFQ", "Missing Lines", "Quantity Shortfall", "Delivers to All Locations", "Q&A Style",
+             "Lines Quoted", "Lines in RFQ", "Missing Items", "Items Not in RFQ", "Missing Lines", "Quantity Shortfall", "Delivers to All Locations", "Q&A Style",
              "Avg QA Confidence / 10", "Lead Time (Days)", "Payment Terms", "Freight Included", "Bundle Conditions", "Special Notes", "Proposal"]
     vsum = pd.DataFrame(out, columns=order)
     if not vsum.empty:

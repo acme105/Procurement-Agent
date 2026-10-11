@@ -167,11 +167,12 @@ export async function render(root) {
     if (tab === 'vendor_summary') {
       return h('div', { class: 'fill' }, grid(t.vendor_summary, {
         frozen: { Rank: 56, Vendor: 190 },
-        cols: ['Rank', 'Vendor', 'Compliance Status', 'Final Landed Cost (INR)', 'Fail Reasons', 'Flags', 'Discount %', 'Lines Quoted', 'Quantity Shortfall',
+        cols: ['Rank', 'Vendor', 'Compliance Status', 'Final Landed Cost (INR)', 'Fail Reasons', 'Missing Items', 'Items Not in RFQ', 'Flags', 'Discount %', 'Lines Quoted', 'Quantity Shortfall',
           'Delivers to All Locations', 'Q&A Style', 'Avg QA Confidence / 10', 'Lead Time (Days)', 'Payment Terms', 'Freight Included', 'Bundle Conditions', 'Special Notes'],
         cell: (c, v) => c === 'Vendor' ? h('td', { style: { whiteSpace: 'nowrap' } }, vendorLink(v))
           : c === 'Compliance Status' ? h('td', {}, h('span', { class: `pill xs ${v === 'PASS' ? 'tone-success' : 'tone-error'}` }, v))
-            : td(c, v) }));
+            : ['Fail Reasons', 'Missing Items', 'Items Not in RFQ', 'Flags'].includes(c) ? h('td', { class: 'wrap', style: { minWidth: '260px' } }, h('div', { class: 'clamp3', title: v || '', style: { WebkitLineClamp: 3 } }, v || '—'))
+              : td(c, v) }));
     }
     if (tab === 'line_matrix') {
       const fixed = ['RFQ Line', 'Item', 'Location', 'Qty'];
