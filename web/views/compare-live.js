@@ -286,7 +286,7 @@ export async function render(root) {
     const ready = run && run.manifest.status !== 'running' && Object.keys(run.tables).length;
     const intro = chat.length ? [] : [h('div', { class: 'card tight' }, ready ? 'Hi, I’m Ana. Ask me anything about these quotes. I answer from the comparison tables and can add new parameters to compare on.' : 'Run the comparison first, then ask me about the quotes.'),
       ready ? h('div', { class: 'row' }, ...SUGGEST.map(s => h('button', { class: 'chip', onclick: () => { input.value = s; ask(); } }, s))) : null];
-    chatLog.replaceChildren(...intro, ...chat.map(m => m.role === 'user'
+    chatLog.replaceChildren(...intro.filter(Boolean), ...chat.map(m => m.role === 'user'
       ? h('div', { class: 'bubble-q', style: { alignSelf: 'flex-end', maxWidth: '88%' } }, m.text)
       : h('div', { class: 'card tight chat-md', style: { maxWidth: '96%', overflowX: 'auto', ...(m.error ? { background: 'var(--err-bg)' } : {}) }, html: md(m.text) })));
     chatLog.scrollTop = chatLog.scrollHeight;
