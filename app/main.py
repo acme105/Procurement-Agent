@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from . import config
 from .live_rfx import smtp_settings
 
-ROUTER_MODULES = ["live_rfx", "live_compare", "live_analyst"]
+ROUTER_MODULES = ["live_rfx", "live_compare", "live_scorecard", "live_analyst"]
 
 app = FastAPI(title="Procurement")
 

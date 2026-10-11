@@ -31,7 +31,7 @@ from .util import iso, sha256_file
 router = APIRouter()
 EXTRACT_PROMPT = "live_extract.v1"
 PARAM_PROMPT = "live_param.v1"
-TABLES = ["vendor_summary", "line_matrix", "cherry_pick", "line_items", "questionnaire", "rfq_lines", "parameters"]
+TABLES = ["vendor_summary", "scorecard", "line_matrix", "cherry_pick", "line_items", "questionnaire", "rfq_lines", "parameters"]
 DEFAULTS = {"fx_usd_inr": 84.0, "qa_threshold": 6.0}
 _mlock = threading.Lock()
 
@@ -260,17 +260,37 @@ def _execute(rid: str, run_id: str) -> None:
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
         list(ex.map(lambda p: _extract_one(rid, run_id, p, instructions, st), m["proposals"]))
     try:
-        tables, summary = compute(rid, run_id, m["settings"])
-        for name, df in tables.items():
-            df.to_parquet(run_dir(rid, run_id) / f"{name}.parquet", index=False)
+        from . import live_scorecard as SC
+        sc, created = SC.ensure_standard(rid)           # the starting scorecard is proposed once, from the RFQ
+        SC.refresh_custom(rid, run_id)                  # custom rubrics are scored for new or changed proposals (pressing Run approves this)
+        summary = write_tables(rid, run_id, m["settings"])
         for prm in m.get("parameters", []):          # parameters added in earlier runs are carried forward
             extract_parameter(rid, run_id, prm["name"], prm["description"], record=False)
+        if created:
+            SC.announce(rid, sc, run_id)
         status = "done" if any(p["status"] == "done" for p in read_manifest(rid, run_id)["proposals"]) else "failed"
         _update(rid, run_id, lambda m: m.update(status=status, finished_at=iso(config.real_now()), summary=summary))
         if status == "done":
             (adir(rid) / "latest.txt").write_text(run_id)
     except Exception as e:
         _update(rid, run_id, lambda m: m.update(status="failed", finished_at=iso(config.real_now()), error=f"{type(e).__name__}: {str(e)[:300]}"))
+
+
+def write_tables(rid: str, run_id: str, settings: dict) -> dict:
+    tables, summary = compute(rid, run_id, settings)
+    for name, df in tables.items():
+        df.to_parquet(run_dir(rid, run_id) / f"{name}.parquet", index=False)
+    return summary
+
+
+def rebuild_tables(rid: str, run_id: str) -> list[dict]:
+    """Recompute a finished run's tables from its saved extractions and the current scorecard. No model calls."""
+    m = read_manifest(rid, run_id)
+    summary = write_tables(rid, run_id, m["settings"])
+    _update(rid, run_id, lambda mm: mm.update(summary=summary))
+    vs = pd.read_parquet(run_dir(rid, run_id) / "vendor_summary.parquet")
+    cols = [c for c in ("Rank", "Vendor", "Compliance Status", "Score / 100", "Final Landed Cost (INR)", "Fail Reasons") if c in vs.columns]
+    return records(vs[cols])
 
 
 def extractions(rid: str, run_id: str) -> list[dict]:
@@ -303,7 +323,8 @@ def _uom_multiplier(uom: str) -> float:
     return float(m.group(1)) if m else 1.0
 
 
-def compute(rid: str, run_id: str, settings: dict, exclude: Optional[list[str]] = None) -> tuple[dict, dict]:
+def compute(rid: str, run_id: str, settings: dict, exclude: Optional[list[str]] = None,
+            scorecard_version: Optional[int] = None) -> tuple[dict, dict]:
     """All comparison tables from a run's extractions. `exclude` drops vendors (organisation names) for scenarios."""
     v = L.view(L.load(rid))
     fx, qa_min = float(settings.get("fx_usd_inr", 84.0)), float(settings.get("qa_threshold", 6.0))
@@ -408,9 +429,16 @@ def compute(rid: str, run_id: str, settings: dict, exclude: Optional[list[str]] 
              "Lines Quoted", "Lines in RFQ", "Missing Items", "Items Not in RFQ", "Missing Lines", "Quantity Shortfall", "Delivers to All Locations", "Q&A Style",
              "Avg QA Confidence / 10", "Lead Time (Days)", "Payment Terms", "Freight Included", "Bundle Conditions", "Special Notes", "Proposal"]
     vsum = pd.DataFrame(out, columns=order)
-    if not vsum.empty:
-        vsum = vsum.sort_values(["Compliance Status", "Final Landed Cost (INR)"], ascending=[False, True]).reset_index(drop=True)
-        vsum.insert(0, "Rank", range(1, len(vsum) + 1))
+    from . import live_scorecard as SC            # imported here: live_scorecard imports this module
+    scored = SC.apply(rid, vsum, qdf, scorecard_version) if not vsum.empty else None
+    if scored:
+        vsum, score_tbl = scored
+    else:                                         # no scorecard yet: the cost-only ranking
+        score_tbl = pd.DataFrame(columns=SC.SCORE_COLS)
+        if not vsum.empty:
+            vsum = vsum.sort_values(["Compliance Status", "Final Landed Cost (INR)"], ascending=[False, True]).reset_index(drop=True)
+            vsum.insert(0, "Rank", range(1, len(vsum) + 1))
+            vsum["Cost rank"] = vsum["Rank"]
 
     # line matrix: RFQ line x vendor, lowest normalised unit price
     best = m_li.groupby(["RFQ Line", "Vendor"])["Norm Unit Price (INR)"].min().unstack("Vendor") if not m_li.empty else pd.DataFrame()
@@ -441,13 +469,16 @@ def compute(rid: str, run_id: str, settings: dict, exclude: Optional[list[str]] 
     summary = {"cherry_pick_total": total_cp, "cherry_pick_basis": basis,
                "cherry_pick_uncovered_lines": int(cpdf["Vendor"].isna().sum()) if not cpdf.empty else 0,
                "best_single_source": best_single,
-               "best_single_vendor": passing.iloc[0]["Vendor"] if not passing.empty else None,
+               "best_single_vendor": passing.loc[passing["Final Landed Cost (INR)"].idxmin(), "Vendor"] if not passing.empty else None,
+               "scorecard_version": int(vsum["Scorecard Version"].iloc[0]) if "Scorecard Version" in vsum and not vsum.empty else None,
+               "top_by_score": vsum.iloc[0]["Vendor"] if scored and not vsum.empty else None,
+               "top_by_cost": vsum.sort_values("Cost rank").iloc[0]["Vendor"] if "Cost rank" in vsum and not vsum.empty else None,
                "savings_vs_best_single": (best_single - total_cp) if best_single is not None else None,
                "vendors": int(len(vsum)), "passing": int(len(passing)), "fx_usd_inr": fx, "qa_threshold": qa_min,
                "excluded": sorted(exclude or [])}
     params_f = run_dir(rid, run_id) / "parameters.parquet"
     params = pd.read_parquet(params_f) if params_f.exists() else pd.DataFrame(columns=["Parameter", "Description", "Vendor", "Value", "Evidence", "Confidence"])
-    return {"vendor_summary": vsum, "line_matrix": matrix, "cherry_pick": cpdf, "line_items": li,
+    return {"vendor_summary": vsum, "scorecard": score_tbl, "line_matrix": matrix, "cherry_pick": cpdf, "line_items": li,
             "questionnaire": qdf, "rfq_lines": rfq, "parameters": params}, summary
 
 

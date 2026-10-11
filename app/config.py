@@ -20,6 +20,8 @@ MODEL = os.environ.get("AERCHAIN_MODEL", "gpt-6-luna")
 JOBS: dict[str, tuple[str, int]] = {
     "live_extract": ("medium", 32000),
     "live_param": ("low", 2000),
+    "live_scorecard": ("low", 4000),
+    "live_criterion": ("low", 4000),
 }
 MODELS: dict[str, str] = {job: os.environ.get(f"AERCHAIN_MODEL_{job.upper()}", MODEL) for job in JOBS}
 LLM_CONCURRENCY = 4

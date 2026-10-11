@@ -16,7 +16,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from . import config, live_compare as C, live_rfx as L, llm
+from . import config, live_compare as C, live_rfx as L, live_scorecard as SC, llm
 from .util import iso
 
 router = APIRouter()
@@ -39,7 +39,15 @@ Rules:
 - When asked why a vendor failed or what it missed, name the specific items: use the Fail Reasons, Missing Items and
   Items Not in RFQ columns of vendor_summary. Give both what it did not quote and what it quoted that the RFQ never asked
   for (extra items are a compliance miss), in the first answer, without waiting to be asked again.
-- Compliance rules: FAIL on quantity shortfall, quoting items not in the RFQ, no questionnaire answers, or individual answers averaging below the QA
+- Scorecard: vendors are ranked by a weighted score out of 100 over criteria (price, lead time, one per RFQ question and any
+  custom ones). The standard weights were proposed from the RFQ. When the buyer states weights or relations ("delivery twice
+  as important as warranty") call update_weights with exactly what they said; the code does the arithmetic. Report the final
+  weights and the new top vendors from the tool result. Weight and minimum changes recompute instantly and re-read nothing:
+  say so. To add or change what a criterion rewards, call propose_criterion with a clear rubric (what earns 10, what earns 0)
+  and pick a sensible weight if the buyer gave none. If it returns needs_approval, put its say_to_buyer question to the
+  buyer and STOP: never call apply_pending until the buyer has answered yes in a later message (they may also press the
+  Proceed button). Minimum scores that fail vendors are set with set_minimum.
+- Compliance rules: FAIL on quantity shortfall, quoting items not in the RFQ, no questionnaire answers, a score below a criterion's minimum, or individual answers averaging below the QA
   threshold. A single blanket answer passes with a flag. Cherry-pick uses PASS vendors without bundle conditions, at RFQ
   quantities, before discounts.
 """
@@ -77,7 +85,8 @@ TOOLS = [
         "parameters": {"type": "object", "properties": {
             "name": {"type": "string", "description": "snake_case scenario name"},
             "exclude_vendors": {"type": "array", "items": {"type": "string"}},
-            "fx_usd_inr": {"type": "number"}, "qa_threshold": {"type": "number"}},
+            "fx_usd_inr": {"type": "number"}, "qa_threshold": {"type": "number"},
+            "scorecard_version": {"type": "integer", "description": "Rank with an earlier scorecard version"}},
             "required": ["name"]}}},
     {"type": "function", "function": {
         "name": "get_evidence",
@@ -90,6 +99,40 @@ TOOLS = [
             "name": {"type": "string", "description": "Short title, e.g. 'Laptop warranty'"},
             "description": {"type": "string", "description": "What exactly to extract, e.g. 'Warranty period offered on laptops, in years'"}},
             "required": ["name", "description"]}}},
+    {"type": "function", "function": {
+        "name": "get_scorecard", "description": "The current scorecard: version, who set it, each criterion's id, name, weight (sums to 100), minimum score, rubric and reason, and any pending change.",
+        "parameters": {"type": "object", "properties": {}}}},
+    {"type": "function", "function": {
+        "name": "update_weights",
+        "description": "Change criterion weights. Give explicit numbers in `weights` ({criterion id or name: number}) and/or `relations` ([{a, b, factor}] meaning weight of a = factor x weight of b). The code normalises to 100 and rejects relations that cannot all hold. Recomputes the rankings instantly; re-reads nothing.",
+        "parameters": {"type": "object", "properties": {
+            "weights": {"type": "object", "additionalProperties": {"type": "number"}},
+            "relations": {"type": "array", "items": {"type": "object", "properties": {
+                "a": {"type": "string"}, "b": {"type": "string"}, "factor": {"type": "number"}}, "required": ["a", "b", "factor"]}},
+            "note": {"type": "string", "description": "Why the buyer asked, in a few words"}}}}},
+    {"type": "function", "function": {
+        "name": "set_minimum",
+        "description": "Set or clear the minimum score (0-10) a vendor needs on a criterion; below it the vendor fails compliance. min_score null clears it. Recomputes instantly.",
+        "parameters": {"type": "object", "properties": {"criterion": {"type": "string"}, "min_score": {"type": ["number", "null"]}},
+                       "required": ["criterion"]}}},
+    {"type": "function", "function": {
+        "name": "propose_criterion",
+        "description": "Add a custom criterion, or change the rubric of an existing one (give question_number to rescore an RFQ question under a new rubric). A new or changed rubric means re-reading every proposal, so this returns needs_approval with the cost: ask the buyer and wait. An unchanged rubric just updates weight/minimum.",
+        "parameters": {"type": "object", "properties": {
+            "name": {"type": "string"},
+            "rubric": {"type": "string", "description": "What earns a 10, what earns a 0, e.g. '10 if it names the dispatch origin and a date for every site; 5 if only dates; 0 if neither'"},
+            "weight": {"type": "number", "description": "Share of 100. If the buyer stated it, set weight_is_exact true; otherwise choose a sensible value (it is then scaled in with the others)"},
+            "weight_is_exact": {"type": "boolean", "description": "true only if the buyer stated this weight"},
+            "min_score": {"type": ["number", "null"]}, "question_number": {"type": ["integer", "null"]},
+            "reason": {"type": "string", "description": "One sentence on why this weight"}},
+            "required": ["name", "rubric"]}}},
+    {"type": "function", "function": {
+        "name": "apply_pending",
+        "description": "Carry out a pending change (re-reads the proposals and scores them). Only after the buyer has said yes in a message sent AFTER you asked. Refused otherwise.",
+        "parameters": {"type": "object", "properties": {"pending_id": {"type": "string"}}, "required": ["pending_id"]}}},
+    {"type": "function", "function": {
+        "name": "remove_criterion", "description": "Remove a criterion; its weight is redistributed. Recomputes instantly.",
+        "parameters": {"type": "object", "properties": {"criterion": {"type": "string"}}, "required": ["criterion"]}}},
     {"type": "function", "function": {
         "name": "open_proposal", "description": "Open a vendor's proposal file in the viewer for the buyer.",
         "parameters": {"type": "object", "properties": {"vendor": {"type": "string"}, "page": {"type": "integer"}},
@@ -121,7 +164,11 @@ def _context(rid: str, run_id: str) -> str:
         df = C.load_table(rid, run_id, name)
         tabs.append(f"- {name} ({len(df)} rows): {', '.join(map(str, df.columns))}")
     vendors = ", ".join(p["org"] for p in m["proposals"])
-    return (f"{SYSTEM}\nRFQ {rid}: {v['scope']}\n{len(v['lines'])} lines, {len(v['questionnaire'])} questions. "
+    sc = SC.load_version(rid)
+    scorecard = (f"Scorecard v{sc['version']} (set by {sc['author']}): {SC.describe(sc)}" if sc else "No scorecard yet (it is created by Run comparison)")
+    pend = [p["title"] + f" [{p['id']}]" for p in SC.load_pending(rid) if p["status"] == "pending"]
+    return (f"{SYSTEM}\n{scorecard}" + (f"\nPending (awaiting the buyer's yes): {'; '.join(pend)}" if pend else "") +
+            f"\nRFQ {rid}: {v['scope']}\n{len(v['lines'])} lines, {len(v['questionnaire'])} questions. "
             f"Run {run_id} ({m['created_at']}), settings {json.dumps(m['settings'])}.\nVendors: {vendors}\n"
             f"Headline numbers: {json.dumps(m.get('summary', {}))}\n\nTables:\n" + "\n".join(tabs))
 
@@ -191,7 +238,48 @@ def _out(df: pd.DataFrame) -> str:
                        "note": f"showing first {MAX_ROWS}" if len(df) > MAX_ROWS else None}, ensure_ascii=False, default=str)
 
 
-def call_tool(rid: str, run_id: str, name: str, a: dict, events: list) -> str:
+def _sc_result(rid: str, v: dict, extra: Optional[dict] = None) -> str:
+    ranking = SC.rebuild(rid)
+    return json.dumps({"scorecard_version": v["version"], "weights": [{"id": c["id"], "name": c["name"], "weight": c["weight"], "min_score": c.get("min_score")}
+                                                                      for c in v["criteria"]], "ranking": ranking, **(extra or {})}, default=str)
+
+
+def call_tool(rid: str, run_id: str, name: str, a: dict, events: list, ctx: Optional[dict] = None) -> str:
+    ctx = ctx or {}
+    if name == "get_scorecard":
+        sc, _ = SC.ensure_standard(rid)
+        return json.dumps({**SC.overview(rid), "criteria": [{k: c.get(k) for k in ("id", "name", "weight", "min_score", "rubric", "reason")} for c in sc["criteria"]]}, default=str)
+    if name in ("update_weights", "set_minimum", "remove_criterion"):
+        if name == "update_weights":
+            v = SC.apply_weights(rid, a.get("weights"), a.get("relations"), a.get("note") or "")
+        elif name == "set_minimum":
+            sc, _ = SC.ensure_standard(rid)
+            cid = SC.find(sc, a["criterion"])["id"]
+            ms = a.get("min_score")
+            v = SC.update(rid, lambda cs: [{**c, "min_score": (None if ms is None else float(ms))} if c["id"] == cid else c for c in cs],
+                          f"Minimum on {cid}: {'cleared' if ms is None else ms}")
+        else:
+            v = SC.remove_criterion(rid, a["criterion"])
+        events.append(("tables", ["vendor_summary", "scorecard"]))
+        return _sc_result(rid, v, {"note": "Recomputed from saved tables; nothing was re-read."})
+    if name == "propose_criterion":
+        res = SC.propose_criterion(rid, a["name"], a.get("rubric", ""), a.get("weight"), a.get("min_score"), a.get("question_number"),
+                                   ctx.get("user_msgs", 0), a.get("reason", ""), bool(a.get("weight_is_exact")))
+        if res.get("applied"):
+            events.append(("tables", ["vendor_summary", "scorecard"]))
+            return _sc_result(rid, SC.load_version(rid), {"note": "Rubric unchanged: weight or minimum updated, nothing re-read."})
+        events.append(("pending", [res["pending_id"]]))
+        return json.dumps(res)
+    if name == "apply_pending":
+        pend = next((p for p in SC.load_pending(rid) if p["id"] == a.get("pending_id")), None)
+        if not pend:
+            return "Error: no such pending change"
+        if not SC.typed_approval_ok(pend, ctx.get("user_text", ""), ctx.get("user_msgs", 0)):
+            return ("Refused: the buyer has not said yes since you proposed this. Ask them (say_to_buyer) and wait; "
+                    "they can also press the Proceed button.")
+        res = SC.execute_pending(rid, pend["id"])
+        events.append(("tables", ["vendor_summary", "scorecard"]))
+        return json.dumps({"scorecard_version": res["version"], "ranking": res["ranking"], "note": "Proposals were re-read and scored."}, default=str)
     if name == "list_tables":
         return json.dumps([{"table": n, "rows": len(df := C.load_table(rid, run_id, n)), "columns": list(map(str, df.columns))}
                            for n in C.table_names(rid, run_id)])
@@ -210,12 +298,13 @@ def call_tool(rid: str, run_id: str, name: str, a: dict, events: list) -> str:
     if name == "run_scenario":
         m = C.read_manifest(rid, run_id)
         settings = {**m["settings"], **{k: a[k] for k in ("fx_usd_inr", "qa_threshold") if a.get(k) is not None}}
-        tables, summary = C.compute(rid, run_id, settings, exclude=a.get("exclude_vendors"))
+        tables, summary = C.compute(rid, run_id, settings, exclude=a.get("exclude_vendors"), scorecard_version=a.get("scorecard_version"))
         base = a.get("name") or "scenario"
         saved = [C.save_derived(rid, run_id, f"{base}_summary", tables["vendor_summary"]),
                  C.save_derived(rid, run_id, f"{base}_cherry_pick", tables["cherry_pick"])]
         events.append(("tables", saved))
-        top = tables["vendor_summary"][["Rank", "Vendor", "Compliance Status", "Fail Reasons", "Final Landed Cost (INR)"]]
+        vs = tables["vendor_summary"]
+        top = vs[[c for c in ("Rank", "Vendor", "Compliance Status", "Score / 100", "Fail Reasons", "Final Landed Cost (INR)") if c in vs.columns]]
         return json.dumps({"summary": summary, "ranking": C.records(top), "saved": saved}, default=str)
     if name == "get_evidence":
         p = _vendor(rid, run_id, a["vendor"])
@@ -257,7 +346,7 @@ class AskIn(BaseModel):
 @router.get("/api/live/rfqs/{rid}/analyst")
 def get_chat(rid: str):
     L.load(rid)
-    return {"chat": load_chat(rid)["chat"]}
+    return {"chat": load_chat(rid)["chat"], "pending": [p for p in SC.load_pending(rid) if p["status"] == "pending"]}
 
 
 @router.post("/api/live/rfqs/{rid}/analyst/reset")
@@ -300,7 +389,8 @@ def ask(rid: str, body: AskIn):
                         yield _sse("tool", {"name": tc.function.name})
                         events: list = []
                         try:
-                            out = call_tool(rid, run_id, tc.function.name, json.loads(tc.function.arguments or "{}"), events)
+                            out = call_tool(rid, run_id, tc.function.name, json.loads(tc.function.arguments or "{}"), events,
+                                            {"user_text": text, "user_msgs": sum(1 for c in st["chat"] if c["role"] == "user")})
                         except Exception as e:            # bad column, unknown vendor: tell the model so it can retry
                             out = f"Error: {type(e).__name__}: {str(e)[:300]}"
                         msgs.append({"role": "tool", "tool_call_id": tc.id, "content": out})

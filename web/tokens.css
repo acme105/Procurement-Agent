@@ -184,3 +184,11 @@ details.query summary { cursor: pointer; color: var(--primary); font-weight: 600
 .cmp-table td.wrap.long { min-width: 420px; max-width: 760px; font-size: 11px; }
 
 .clamp2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* Scorecard */
+.cmp-table td.sc-hi { background: var(--ok-bg); color: var(--ok-fg); font-weight: 600; }
+.cmp-table td.sc-mid { background: var(--warn-bg); color: var(--warn-fg); }
+.cmp-table td.sc-lo { background: var(--err-bg); color: var(--err-fg); }
+.cmp-table tr.sc-total td { border-top: 2px solid var(--border-strong); background: #F7F8FB; }
+.cmp-table tr.sc-total td.fz { background: #F7F8FB; }
+.pending-card { border-color: var(--outline); background: var(--ind-bg); }

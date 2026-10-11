@@ -4,11 +4,11 @@
 import { h, api, toast, modal, tabs, inr, istDateTime, qs, setQs, download } from '../components.js';
 import { openViewer } from '../viewer.js';
 
-const TABS = [['vendor_summary', 'Summary'], ['line_matrix', 'Lines'], ['cherry_pick', 'Cherry-pick'], ['questionnaire', 'Q&A'],
+const TABS = [['vendor_summary', 'Summary'], ['scorecard', 'Scorecard'], ['line_matrix', 'Lines'], ['cherry_pick', 'Cherry-pick'], ['questionnaire', 'Q&A'],
   ['parameters', 'Custom'], ['derived', 'Analyst tables']];
 const SUGGEST = ['Which compliant vendor is cheapest overall?', 'Why did the failing vendors fail?',
   'What else should we compare these proposals on?', 'Compare laptop warranty across vendors'];
-const FZ = (w) => ({ left: '0px', width: `${w}px`, minWidth: `${w}px`, maxWidth: `${w}px` });
+const FZ = (w, left = 0) => ({ left: `${left}px`, width: `${w}px`, minWidth: `${w}px`, maxWidth: `${w}px` });
 const NUM = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 });
 
 function fmt(col, v) {
@@ -49,6 +49,7 @@ export async function render(root) {
     return;
   }
   let home = null, runId = null, run = null, tab = 'vendor_summary', derivedSel = null, chat = [], busy = false, polling = false;
+  let rankBy = 'score', pending = [], scInfo = null, approving = null;
 
   const left = h('div', { class: 'cmp-left' });
   const chatLog = h('div', { class: 'stack', style: { flex: 1, overflow: 'auto', gap: '10px', paddingRight: '4px' } });
@@ -63,11 +64,17 @@ export async function render(root) {
   root.classList.add('fill-view');                 // this view fills the window height; app.js removes the class on navigation
   root.replaceChildren(h('div', { class: 'cmp-grid' }, left, chatCard));
 
+  async function loadChat() {
+    const a = await api(`/api/live/rfqs/${rid}/analyst`);
+    chat = a.chat; pending = a.pending || [];
+    scInfo = await api(`/api/live/rfqs/${rid}/scorecard`);
+  }
+
   async function load({ keepRun = false } = {}) {
     home = await api(`/api/live/rfqs/${rid}/compare`);
     if (!keepRun || !runId) runId = home.latest || (home.runs.length ? home.runs[home.runs.length - 1].run_id : null);
     run = runId ? await api(`/api/live/rfqs/${rid}/runs/${runId}`) : null;
-    chat = (await api(`/api/live/rfqs/${rid}/analyst`)).chat;
+    await loadChat();
     drawLeft(); drawChat();
     if (run && run.manifest.status === 'running') pollRun();
     if (qs().get('view') === 'rfq') openViewer(rid, 0, { rfq: true });
@@ -124,7 +131,12 @@ export async function render(root) {
       if (tab === 'derived' && derived.length && (!derivedSel || !derived.includes(derivedSel))) derivedSel = derived[derived.length - 1];
       parts.push(h('div', { class: 'cmp-tabrow' },
         tabs(TABS.map(([id, label]) => [id, label, id === 'derived' ? derived.length : id === 'parameters' ? new Set((run.tables.parameters || []).map(r => r.Parameter)).size : undefined]), tab, (t) => { tab = t; drawLeft(); }),
-        tab === 'derived' && !derived.length ? null : tableActions(tab === 'derived' ? derivedSel : tab)));
+        h('div', { class: 'row', style: { flexWrap: 'nowrap', gap: '10px' } },
+          tab === 'vendor_summary' && (run.tables.scorecard || []).length ? h('div', { class: 'row', style: { flexWrap: 'nowrap', gap: '4px' } },
+            h('span', { class: 'small muted' }, 'Rank by'),
+            h('button', { class: `chip${rankBy === 'score' ? ' on' : ''}`, onclick: () => { rankBy = 'score'; drawLeft(); } }, 'Score'),
+            h('button', { class: `chip${rankBy === 'cost' ? ' on' : ''}`, onclick: () => { rankBy = 'cost'; drawLeft(); } }, 'Cost')) : null,
+          tab === 'derived' && !derived.length ? null : tableActions(tab === 'derived' ? derivedSel : tab))));
       parts.push(tabBody(derived));
     }
     left.replaceChildren(...parts);
@@ -165,15 +177,19 @@ export async function render(root) {
   function tabBody(derived) {
     const t = run.tables;
     if (tab === 'vendor_summary') {
-      return h('div', { class: 'fill' }, grid(t.vendor_summary, {
+      const hasScore = (t.scorecard || []).length > 0;
+      const rows = [...t.vendor_summary].sort((a, b) => (a['Compliance Status'] === b['Compliance Status'] ? 0 : a['Compliance Status'] === 'PASS' ? -1 : 1)
+        || ((hasScore && rankBy === 'score' ? a.Rank - b.Rank : (a['Cost rank'] ?? a.Rank) - (b['Cost rank'] ?? b.Rank)))).map((r, i) => ({ ...r, Rank: i + 1 }));
+      return h('div', { class: 'fill' }, grid(rows, {
         frozen: { Rank: 56, Vendor: 190 },
-        cols: ['Rank', 'Vendor', 'Compliance Status', 'Final Landed Cost (INR)', 'Fail Reasons', 'Missing Items', 'Items Not in RFQ', 'Flags', 'Discount %', 'Lines Quoted', 'Quantity Shortfall',
+        cols: ['Rank', 'Vendor', 'Compliance Status', ...(hasScore ? ['Score / 100'] : []), 'Final Landed Cost (INR)', 'Fail Reasons', 'Missing Items', 'Items Not in RFQ', 'Flags', 'Discount %', 'Lines Quoted', 'Quantity Shortfall',
           'Delivers to All Locations', 'Q&A Style', 'Avg QA Confidence / 10', 'Lead Time (Days)', 'Payment Terms', 'Freight Included', 'Bundle Conditions', 'Special Notes'],
         cell: (c, v) => c === 'Vendor' ? h('td', { style: { whiteSpace: 'nowrap' } }, vendorLink(v))
           : c === 'Compliance Status' ? h('td', {}, h('span', { class: `pill xs ${v === 'PASS' ? 'tone-success' : 'tone-error'}` }, v))
             : ['Fail Reasons', 'Missing Items', 'Items Not in RFQ', 'Flags', 'Bundle Conditions', 'Special Notes', 'Payment Terms'].includes(c) ? h('td', { class: 'wrap long' }, v || '—')
               : td(c, v) }));
     }
+    if (tab === 'scorecard') return scorecardBody(t);
     if (tab === 'line_matrix') {
       const fixed = ['RFQ Line', 'Item', 'Location', 'Qty'];
       const rows = t.line_matrix || [];
@@ -282,6 +298,63 @@ export async function render(root) {
     ]);
   }
 
+  function scorecardBody(t) {
+    const sc = scInfo && scInfo.version ? scInfo : null;
+    const rows = t.scorecard || [];
+    if (!sc || !rows.length) return h('div', { class: 'card empty' }, 'No scorecard yet. Press Run comparison and I will propose one from the RFQ.');
+    const vendors = (t.vendor_summary || []).map(r => r.Vendor);
+    const summary = Object.fromEntries((t.vendor_summary || []).map(r => [r.Vendor, r]));
+    const cell = (c, v) => rows.find(r => r['Criterion Id'] === c.id && r.Vendor === v);
+    const cls = (s) => s >= 8 ? 'sc-hi' : s >= 5 ? 'sc-mid' : 'sc-lo';
+    const head = h('div', { class: 'small muted' }, `Scorecard version ${sc.version} · set by ${sc.author === 'model' ? 'the model from the RFQ' : 'you in chat'}${sc.note ? ` · ${sc.note}` : ''} · `,
+      'tell Ana what matters more, or add a criterion; ', h('span', {}, `${sc.versions.length} version${sc.versions.length > 1 ? 's' : ''} saved`));
+    return h('div', { class: 'fill' }, head, h('div', { class: 'cmp-table' }, h('table', { class: 'grid' },
+      h('thead', {}, h('tr', {}, h('th', { class: 'fz', style: FZ(280, 0) }, 'Criterion'), h('th', { class: 'num' }, 'Weight'), h('th', { class: 'num' }, 'Min'),
+        ...vendors.map(v => h('th', { class: 'num' }, vendorLink(v))))),
+      h('tbody', {},
+        ...sc.criteria.map(c => h('tr', {},
+          h('td', { class: 'fz fz-last wrap', style: FZ(280, 0), title: c.reason || '' }, h('b', {}, c.name), c.rubric ? h('div', { class: 'small muted' }, `Rubric: ${c.rubric}`) : (c.reason ? h('div', { class: 'small muted' }, c.reason) : null)),
+          h('td', { class: 'num' }, `${(+c.weight).toFixed(1)}`), h('td', { class: 'num' }, c.min_score == null ? '—' : c.min_score),
+          ...vendors.map(v => { const r = cell(c, v); return r ? h('td', { class: `num ${cls(r.Score)}`, title: `${r.Reason || ''}${r.Quote ? ` — “${r.Quote}”` : ''}` }, r.Score.toFixed(1), r.Source === 'document' ? h('span', { class: 'small', style: { marginLeft: '4px' } }, '▤') : null) : h('td', {}, '—'); }))),
+        h('tr', { class: 'sc-total' }, h('td', { class: 'fz fz-last', style: FZ(280, 0) }, h('b', {}, 'Score / 100')), h('td', { class: 'num' }, sc.criteria.reduce((a, c) => a + +c.weight, 0).toFixed(0)), h('td', {}),
+          ...vendors.map(v => h('td', { class: 'num' }, h('b', {}, summary[v] && summary[v]['Score / 100'] != null ? summary[v]['Score / 100'].toFixed(1) : '—'),
+            summary[v] ? h('div', {}, h('span', { class: `pill xs ${summary[v]['Compliance Status'] === 'PASS' ? 'tone-success' : 'tone-error'}` }, summary[v]['Compliance Status'])) : null)))))));
+  }
+
+  function pendingCard(p) {
+    const status = h('div', { class: 'small muted' }, `${p.proposals} proposals · ${p.estimate_s < 90 ? `about ${p.estimate_s} s` : `about ${Math.round(p.estimate_s / 60)} min`} (scans and photos take longest)`);
+    const go = h('button', { class: 'btn primary sm', onclick: () => approve(p, go, no, status) }, 'Proceed');
+    const no = h('button', { class: 'btn sm', onclick: async () => { await api(`/api/live/rfqs/${rid}/analyst/pending/${p.id}/cancel`, { method: 'POST' }); pending = pending.filter(x => x.id !== p.id); drawChat(); } }, 'Cancel');
+    return h('div', { class: 'card tight pending-card' }, h('div', { class: 'strong' }, p.title), h('div', { class: 'small muted' }, 'This re-reads the vendors’ documents. Weight and minimum changes never do.'),
+      h('div', { class: 'row', style: { marginTop: '8px' } }, go, no, status));
+  }
+
+  async function approve(p, go, no, status) {
+    go.disabled = no.disabled = true; approving = p.id;
+    try {
+      const res = await fetch(`/api/live/rfqs/${rid}/analyst/pending/${p.id}/approve`, { method: 'POST' });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || res.statusText);
+      const reader = res.body.getReader(), dec = new TextDecoder();
+      let buf = '', failed = null;
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        let i;
+        while ((i = buf.indexOf('\n\n')) >= 0) {
+          const block = buf.slice(0, i); buf = buf.slice(i + 2);
+          const ev = /event: (\w+)/.exec(block)?.[1], raw = /data: (.*)/s.exec(block)?.[1];
+          if (ev === 'progress') status.textContent = `Scored ${JSON.parse(raw).done} of ${JSON.parse(raw).total}…`;
+          if (ev === 'error') failed = JSON.parse(raw).message;
+        }
+      }
+      if (failed) throw new Error(failed);
+      toast('Scorecard updated'); tab = 'scorecard';
+      run = await api(`/api/live/rfqs/${rid}/runs/${runId}`); await loadChat(); drawLeft(); drawChat();
+    } catch (e) { toast(e.message); go.disabled = no.disabled = false; }
+    approving = null;
+  }
+
   // ---- right: analyst chat ----
   function drawChat() {
     const ready = run && run.manifest.status !== 'running' && Object.keys(run.tables).length;
@@ -289,7 +362,8 @@ export async function render(root) {
       ready ? h('div', { class: 'row' }, ...SUGGEST.map(s => h('button', { class: 'chip', onclick: () => { input.value = s; ask(); } }, s))) : null];
     chatLog.replaceChildren(...intro.filter(Boolean), ...chat.map(m => m.role === 'user'
       ? h('div', { class: 'bubble-q', style: { alignSelf: 'flex-end', maxWidth: '88%' } }, m.text)
-      : h('div', { class: 'card tight chat-md chat-msg', style: { maxWidth: '100%', ...(m.error ? { background: 'var(--err-bg)' } : {}) }, html: md(m.text) })));
+      : h('div', { class: 'card tight chat-md chat-msg', style: { maxWidth: '100%', ...(m.error ? { background: 'var(--err-bg)' } : {}) }, html: md(m.text) })),
+      ...pending.map(pendingCard));
     chatLog.scrollTop = chatLog.scrollHeight;
     input.disabled = sendBtn.disabled = !ready || busy;
   }
@@ -319,12 +393,14 @@ export async function render(root) {
           else if (ev === 'tables') {
             run = await api(`/api/live/rfqs/${rid}/runs/${runId}`);
             const d = data.find(n => n.startsWith('derived/'));
-            if (d) { tab = 'derived'; derivedSel = d; } else if (data.includes('parameters')) tab = 'parameters';
+            if (d) { tab = 'derived'; derivedSel = d; } else if (data.includes('parameters')) tab = 'parameters'; else if (data.includes('scorecard')) tab = 'scorecard';
+            scInfo = await api(`/api/live/rfqs/${rid}/scorecard`);
             drawLeft();
           } else if (ev === 'open') openProposal(data.n, data.page);
         }
       }
     } catch (e) { toast(e.message); }
+    try { await loadChat(); } catch { /* keep what is shown */ }
     busy = false; typing.style.visibility = 'hidden'; drawChat(); input.focus();
   }
   sendBtn.addEventListener('click', ask);
