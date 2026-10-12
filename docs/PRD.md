@@ -166,6 +166,8 @@ The product does not have an analytics dashboard. This table separates what the 
 
 **Targets** are not set; with one buyer and a demo data set there is no baseline. The aim of this release is to make the metrics above measurable, not to meet a number.
 
+**Visit alerts.** The owner gets an email when someone opens the sign-in page, the app or a vendor upload link, or signs in (or fails to), with the visitor's IP address and device and network details. Repeat visits are collapsed (one email per visitor per 30 minutes) and capped at 20 an hour.
+
 ## 9. Out of scope
 
 Not built, not deployed, and not implied by the product:

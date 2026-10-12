@@ -671,6 +671,7 @@ button[disabled]{{opacity:.5}}#msg{{margin-top:10px}}.ok{{color:#114E0B}}.err{{c
 <div id="msg"></div><ul id="mine"></ul></div>
 <div class="card"><h2>Line items</h2><table><thead><tr><th>#</th><th>Item</th><th>Location</th><th class="n">Qty</th></tr></thead><tbody>{rows}</tbody></table></div>
 {f'<div class="card"><h2>Please also answer</h2><ol>{qs}</ol></div>' if qs else ''}
+<script src="/web/visit.js" defer></script>
 <script>
 const org=document.getElementById('org');try{{org.value=localStorage.getItem('org')||''}}catch(_){{}}
 const f=document.getElementById('f'),b=document.getElementById('b'),msg=document.getElementById('msg'),mine=document.getElementById('mine');

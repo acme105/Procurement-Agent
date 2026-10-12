@@ -25,11 +25,12 @@ from pydantic import BaseModel
 
 from . import config
 from .util import iso
+from . import visits
 
 router = APIRouter()
 COOKIE = "procurement_session"
 MAX_AGE = 365 * 24 * 3600
-OPEN_EXACT = {"/login", "/web", "/api/health", "/api/auth/login", "/api/auth/logout"}
+OPEN_EXACT = {"/api/visit/beacon", "/login", "/web", "/api/health", "/api/auth/login", "/api/auth/logout"}
 OPEN_PREFIXES = ("/q/", "/api/q/", "/web/")
 _lock = threading.Lock()
 
@@ -152,12 +153,14 @@ def login(body: LoginIn, request: Request):
         raise HTTPException(400, "Enter your password.")
     if not secrets.compare_digest(body.password.encode(), pw.encode()):
         _log("login_failed", request)
+        visits.note("login_failed", request)
         raise HTTPException(401, "That password isn't right.")
     old = request.cookies.get(COOKIE)
     end_session(old)                                                           # a fresh token on every sign-in
     resp = JSONResponse({"ok": True, "next": safe_next(body.next)})
     resp.set_cookie(COOKIE, new_session(pw), max_age=MAX_AGE, httponly=True, samesite="lax", secure=_https(request), path="/")
     _log("login_ok", request)
+    visits.note("login_ok", request)
     return resp
 
 
