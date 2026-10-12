@@ -134,8 +134,8 @@ TOOLS = [
         "parameters": {"type": "object", "properties": {
             "name": {"type": "string"},
             "rubric": {"type": "string", "description": "What earns a 10, what earns a 0, e.g. '10 if it names the dispatch origin and a date for every site; 5 if only dates; 0 if neither'"},
-            "weight": {"type": "number", "description": "Share of 100. If the buyer stated it, set weight_is_exact true; otherwise choose a sensible value (it is then scaled in with the others)"},
-            "weight_is_exact": {"type": "boolean", "description": "true only if the buyer stated this weight"},
+            "weight": {"type": "number", "description": "The share of 100 this criterion gets (the other criteria scale down to fit). Use the buyer's number if they gave one, otherwise choose a sensible share and tell the buyer exactly that figure"},
+            "weight_is_exact": {"type": "boolean", "description": "ignored: the weight is always the exact share"},
             "min_score": {"type": ["number", "null"]}, "question_number": {"type": ["integer", "null"]},
             "reason": {"type": "string", "description": "One sentence on why this weight"}},
             "required": ["name", "rubric"]}}},

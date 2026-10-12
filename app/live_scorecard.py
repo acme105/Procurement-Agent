@@ -415,7 +415,7 @@ def propose_criterion(rid: str, name: str, rubric: str, weight: Optional[float],
             "weight": float(weight) if weight is not None else (existing["weight"] if existing else round(100 / (len(sc["criteria"]) + 1), 1)),
             "min_score": float(min_score) if min_score is not None else (existing or {}).get("min_score"),
             "reason": reason or (existing or {}).get("reason") or "Added by the buyer",
-            "exact": bool(exact and weight is not None)}
+            "exact": weight is not None}                      # a weight given (by the buyer or proposed by Ana) is the share this criterion gets
     props = _proposals_to_score(rid)
     todo = needs_scoring(rid, spec, props) if existing and rubric_hash(existing) == rubric_hash(spec) else props
     if existing and rubric_hash(existing) == rubric_hash(spec) and not todo:

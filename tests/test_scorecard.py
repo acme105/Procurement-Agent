@@ -241,3 +241,15 @@ def test_compare_vendors_returns_every_vendor_with_coverage(state_dir, equal_wei
     assert by["Dear Fast"]["document_excerpts"] == "(no match for the keywords)"
     assert [a["question_number"] for a in by["Cheap Slow"]["answers"]] == [1]                                 # only the asked question
     assert "compare_vendors" in A.SYSTEM and "Never name a winner after looking at some vendors" in A.SYSTEM
+
+
+def test_a_weight_ana_proposes_is_the_exact_share(state_dir, equal_weights, monkeypatch):
+    rid = _setup(VENDORS)
+    SC.ensure_standard(rid)
+    monkeypatch.setattr(C, "read_parts", lambda path: [])
+    monkeypatch.setattr(C, "_upload_path", lambda rid, st, n: None)
+    monkeypatch.setattr(llm, "call", lambda *a, **k: (SC.CriterionScore(score=7.0, reason="r", quote=None, confidence="High"), None))
+    res = SC.propose_criterion(rid, "Delivery plan", "10 if detailed", 25, None, None, user_msgs=1)       # no 'exact' flag: Ana chose 25
+    SC.execute_pending(rid, res["pending_id"])
+    w = {c["id"]: c["weight"] for c in SC.load_version(rid)["criteria"]}
+    assert w["delivery_plan"] == 25 and sum(w.values()) == pytest.approx(100, abs=0.1)                  # what she says is what is saved
