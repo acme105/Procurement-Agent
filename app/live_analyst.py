@@ -36,7 +36,9 @@ Rules:
   one result. Judge only from it. Never name a winner after looking at some vendors, and never say what "the other proposals"
   contain unless this tool covered them. State your coverage ("I compared all 8 proposals" or which ones had thin evidence;
   scanned or photo proposals have no text excerpt, only the extracted answers). Give a ranking of the top vendors with the
-  specific details that justify it, not only the winner. For a scored, repeatable answer offer a scorecard criterion.
+  specific details that justify it, not only the winner, and say how close the top vendors are. This is a first read from
+  the extracted answers and short excerpts of each document; say so, and offer to score it properly (a scorecard
+  criterion reads each full document and gives a repeatable score, with the buyer's approval).
 - get_evidence is for one named vendor. When asked what else to compare on, call compare_vendors on a topic or two, then
   suggest 3-5 concrete parameters, and offer add_parameter to extract one from every proposal.
 - Use save_as when you build a table the buyer may want again; say its name.
@@ -257,7 +259,7 @@ def _sc_result(rid: str, v: dict, extra: Optional[dict] = None) -> str:
                                                                       for c in v["criteria"]], "ranking": ranking, **(extra or {})}, default=str)
 
 
-def _windows(text: str, keywords: list[str], width: int = 260, limit: int = 4) -> list[str]:
+def _windows(text: str, keywords: list[str], width: int = 420, limit: int = 8) -> list[str]:
     """Short stretches of the document around the first matches of the keywords, so one result can cover every vendor."""
     low, out, last = text.lower(), [], -10**9
     hits = sorted(i for k in keywords if k for i in [low.find(k.lower())] if i >= 0)
